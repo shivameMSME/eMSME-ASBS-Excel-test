@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mid-Level Game | EMSME & ASBS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --neon-green:#00ff88; --neon-blue:#00d4ff; --dark-bg:#050a14; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Rajdhani',sans-serif; background:var(--dark-bg); min-height:100vh; color:#e0f0ff; overflow-x:hidden; }
+  .orbitron { font-family:'Orbitron',sans-serif; }
+
+  /* Road */
+  #road-canvas { position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; }
+  .content-overlay { position:relative; z-index:10; }
+
+  /* HUD */
+  .hud-bar { background:rgba(0,10,20,0.9); border-bottom:1px solid rgba(0,212,255,0.3); padding:10px 20px; backdrop-filter:blur(10px); }
+  .hud-stat { text-align:center; }
+  .hud-label { font-size:10px; color:rgba(0,212,255,0.6); text-transform:uppercase; letter-spacing:1px; }
+  .hud-value { font-family:'Orbitron',sans-serif; font-size:16px; font-weight:700; color:#00d4ff; }
+
+  /* Progress road bar */
+  .road-progress { height:8px; background:rgba(255,255,255,0.1); border-radius:4px; position:relative; overflow:hidden; }
+  .road-progress-fill { height:100%; background:linear-gradient(90deg,#00d4ff,#00ff88); border-radius:4px; transition:width 0.6s ease; position:relative; }
+  .road-progress-fill::after { content:'🚗'; position:absolute; right:-12px; top:-8px; font-size:20px; }
+
+  /* Timer circle */
+  .timer-ring { position:relative; display:inline-flex; align-items:center; justify-content:center; }
+  svg.timer-svg { transform:rotate(-90deg); }
+  .timer-text { position:absolute; font-family:'Orbitron',sans-serif; font-size:15px; font-weight:700; color:#00d4ff; }
+
+  /* Question card */
+  .q-card {
+    background:rgba(0,15,30,0.95);
+    border:1px solid rgba(0,212,255,0.3);
+    border-radius:16px;
+    backdrop-filter:blur(20px);
+    padding:28px;
+    position:relative;
+    overflow:hidden;
+  }
+  .q-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    background:linear-gradient(90deg,transparent,#00d4ff,#00ff88,transparent);
+    animation:scanLine 2s linear infinite;
+  }
+  @keyframes scanLine { 0%{opacity:0.4} 50%{opacity:1} 100%{opacity:0.4} }
+
+  /* Option buttons */
+  .opt-btn {
+    background:rgba(0,212,255,0.05);
+    border:1px solid rgba(0,212,255,0.25);
+    border-radius:10px;
+    padding:14px 18px;
+    width:100%;
+    text-align:left;
+    color:#e0f0ff;
+    cursor:pointer;
+    transition:all 0.25s;
+    font-family:'Rajdhani',sans-serif;
+    font-size:15px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .opt-btn:hover:not(.disabled) { background:rgba(0,212,255,0.15); border-color:var(--neon-blue); transform:translateX(4px); }
+  .opt-btn.correct { background:rgba(0,255,136,0.2)!important; border-color:#00ff88!important; color:#00ff88!important; }
+  .opt-btn.wrong { background:rgba(255,60,60,0.2)!important; border-color:#ff3c3c!important; color:#ff3c3c!important; }
+  .opt-btn.disabled { pointer-events:none; }
+  .opt-label { font-family:'Orbitron',sans-serif; font-size:12px; font-weight:700; color:rgba(0,212,255,0.7); min-width:24px; }
+
+  /* Explanation box */
+  .explanation-box {
+    background:rgba(0,255,136,0.07);
+    border:1px solid rgba(0,255,136,0.3);
+    border-radius:10px;
+    padding:14px;
+    margin-top:16px;
+    font-size:14px;
+    color:rgba(224,240,255,0.85);
+    display:none;
+    animation:fadeIn 0.4s ease;
+  }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  /* Speed effect */
+  .speed-lines { position:fixed; top:0; left:0; width:100%; height:100%; z-index:2; pointer-events:none; opacity:0; transition:opacity 0.3s; }
+  .speed-lines.active { opacity:1; }
+
+  /* Car speedometer */
+  .speedometer { display:flex; align-items:center; gap:8px; }
+  .speed-bar { width:80px; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden; }
+  .speed-fill { height:100%; background:linear-gradient(90deg,#00ff88,#00d4ff); border-radius:3px; transition:width 0.5s; }
+
+  /* Feedback flash */
+  .flash-overlay { position:fixed; inset:0; z-index:50; pointer-events:none; opacity:0; transition:opacity 0.2s; }
+  .flash-overlay.green { background:rgba(0,255,136,0.12); }
+  .flash-overlay.red { background:rgba(255,60,60,0.12); }
+
+  /* Question number pill */
+  .q-pill { background:rgba(0,212,255,0.1); border:1px solid rgba(0,212,255,0.4); border-radius:20px; padding:4px 14px; font-family:'Orbitron',sans-serif; font-size:11px; color:#00d4ff; display:inline-block; }
+
+  /* Formula badge */
+  .formula-badge { background:rgba(0,255,136,0.1); border:1px solid rgba(0,255,136,0.3); border-radius:6px; padding:2px 10px; font-size:12px; color:#00ff88; font-family:'Orbitron',sans-serif; display:inline-block; margin-bottom:10px; }
+
+  .nxt-btn {
+    background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,255,136,0.05));
+    border:2px solid #00ff88;
+    color:#00ff88;
+    font-family:'Orbitron',sans-serif;
+    font-weight:700;
+    border-radius:8px;
+    padding:12px 28px;
+    cursor:pointer;
+    transition:all 0.3s;
+    letter-spacing:2px;
+    display:none;
+  }
+  .nxt-btn:hover { box-shadow:0 0 25px rgba(0,255,136,0.5); transform:translateY(-2px); }
+
+  /* Score popup */
+  .score-popup { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0); z-index:60; font-family:'Orbitron',sans-serif; font-size:36px; font-weight:900; transition:all 0.3s; pointer-events:none; }
+  .score-popup.show { transform:translate(-50%,-50%) scale(1); }
+  .score-popup.hide { transform:translate(-50%,-100%) scale(0); opacity:0; }
+</style>
+</head>
+<body>
+
+<!-- Road canvas -->
+<canvas id="road-canvas"></canvas>
+<!-- Flash overlay -->
+<div class="flash-overlay" id="flash"></div>
+<!-- Speed lines -->
+<div class="speed-lines" id="speed-lines">
+  <svg width="100%" height="100%" viewBox="0 0 1000 600" preserveAspectRatio="none">
+    <line x1="0" y1="300" x2="400" y2="300" stroke="rgba(0,212,255,0.3)" stroke-width="1.5"/>
+    <line x1="0" y1="200" x2="350" y2="300" stroke="rgba(0,255,136,0.2)" stroke-width="1"/>
+    <line x1="0" y1="400" x2="350" y2="300" stroke="rgba(0,255,136,0.2)" stroke-width="1"/>
+    <line x1="0" y1="100" x2="300" y2="300" stroke="rgba(0,212,255,0.15)" stroke-width="0.5"/>
+    <line x1="0" y1="500" x2="300" y2="300" stroke="rgba(0,212,255,0.15)" stroke-width="0.5"/>
+  </svg>
+</div>
+
+<div class="content-overlay min-h-screen flex flex-col">
+
+  <!-- HUD Top -->
+  <div class="hud-bar">
+    <div class="flex items-center justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🚗</span>
+        <div>
+          <div class="orbitron text-xs" style="color:#00ff88">MID-LEVEL DRIVE</div>
+          <div class="text-xs" style="color:rgba(0,212,255,0.6)" id="hud-user">Loading...</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-6 flex-wrap justify-center">
+        <div class="hud-stat">
+          <div class="hud-label">Question</div>
+          <div class="hud-value" id="hud-qnum">1 / 25</div>
+        </div>
+        <div class="hud-stat">
+          <div class="hud-label">Score</div>
+          <div class="hud-value" id="hud-score">0</div>
+        </div>
+        <div class="hud-stat">
+          <div class="hud-label">Correct</div>
+          <div class="hud-value" id="hud-correct" style="color:#00ff88">0</div>
+        </div>
+        <div class="timer-ring">
+          <svg class="timer-svg" width="58" height="58" viewBox="0 0 58 58">
+            <circle cx="29" cy="29" r="24" fill="none" stroke="rgba(0,212,255,0.15)" stroke-width="4"/>
+            <circle id="timer-ring-fill" cx="29" cy="29" r="24" fill="none" stroke="#00d4ff" stroke-width="4"
+              stroke-dasharray="150.8" stroke-dashoffset="0" style="transition:stroke-dashoffset 1s linear,stroke 0.5s"/>
+          </svg>
+          <span class="timer-text" id="timer-display">45:00</span>
+        </div>
+      </div>
+    </div>
+    <!-- Progress Road -->
+    <div class="mt-3 px-2">
+      <div class="road-progress">
+        <div class="road-progress-fill" id="road-progress" style="width:4%"></div>
+      </div>
+    </div>
+    <!-- Speed bar -->
+    <div class="mt-2 flex items-center gap-2 px-2">
+      <span class="text-xs" style="color:rgba(0,212,255,0.5)">SPEED</span>
+      <div class="speed-bar"><div class="speed-fill" id="speed-fill" style="width:50%"></div></div>
+      <span class="text-xs orbitron" id="speed-val" style="color:#00ff88">50%</span>
+    </div>
+  </div>
+
+  <!-- Question Area -->
+  <div class="flex-1 flex items-center justify-center p-4">
+    <div class="w-full max-w-2xl">
+      <div class="q-card" id="q-card">
+        <div class="flex items-center justify-between mb-4">
+          <div class="q-pill" id="q-num-display">Q1 of 25</div>
+          <div class="formula-badge" id="q-topic">EXCEL BASICS</div>
+        </div>
+        <h2 class="text-lg md:text-xl font-semibold mb-6 leading-relaxed" id="q-text" style="color:#e0f0ff">Loading question...</h2>
+        <div class="space-y-3" id="options-container"></div>
+        <div class="explanation-box" id="explanation-box">
+          <span style="color:#00ff88;font-weight:600;">📖 Explanation: </span><span id="explanation-text"></span>
+        </div>
+        <div class="mt-5 flex justify-end">
+          <button class="nxt-btn" id="next-btn" onclick="nextQuestion()">NEXT →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="score-popup" id="score-popup"></div>
+
+<script>
+// ===================== ROAD ANIMATION =====================
+const roadCanvas = document.getElementById('road-canvas');
+const rctx = roadCanvas.getContext('2d');
+let roadOffset = 0;
+let roadSpeed = 3;
+function resizeRoad() { roadCanvas.width = window.innerWidth; roadCanvas.height = window.innerHeight; }
+function drawRoad() {
+  const w = roadCanvas.width; const h = roadCanvas.height;
+  rctx.clearRect(0,0,w,h);
+  // Sky gradient
+  const skyGrad = rctx.createLinearGradient(0,0,0,h*0.6);
+  skyGrad.addColorStop(0,'#010810');
+  skyGrad.addColorStop(1,'#0a1525');
+  rctx.fillStyle = skyGrad;
+  rctx.fillRect(0,0,w,h*0.6);
+  // Ground
+  const groundGrad = rctx.createLinearGradient(0,h*0.6,0,h);
+  groundGrad.addColorStop(0,'#0c1a0c');
+  groundGrad.addColorStop(1,'#030803');
+  rctx.fillStyle = groundGrad;
+  rctx.fillRect(0,h*0.6,w,h*0.4);
+  // Road
+  const rw = w*0.5; const rx = (w-rw)/2;
+  rctx.fillStyle = '#1a2010';
+  rctx.beginPath();
+  rctx.moveTo(w*0.3, h*0.6);
+  rctx.lineTo(w*0.7, h*0.6);
+  rctx.lineTo(w, h);
+  rctx.lineTo(0, h);
+  rctx.closePath();
+  rctx.fill();
+  // Road lines
+  for (let i = 0; i < 12; i++) {
+    const y = h*0.6 + ((i * 60 + roadOffset) % (h*0.4));
+    const t = (y - h*0.6) / (h*0.4);
+    const lw = 6 + t*20;
+    const lx = w/2;
+    rctx.fillStyle = `rgba(0,212,255,${0.3 + t*0.3})`;
+    rctx.fillRect(lx - lw/2, y, lw, 20+t*15);
+  }
+  // Road edges neon
+  rctx.strokeStyle = 'rgba(0,255,136,0.6)';
+  rctx.lineWidth = 2;
+  rctx.shadowColor = '#00ff88';
+  rctx.shadowBlur = 8;
+  rctx.beginPath();
+  rctx.moveTo(w*0.3, h*0.6); rctx.lineTo(0, h);
+  rctx.stroke();
+  rctx.beginPath();
+  rctx.moveTo(w*0.7, h*0.6); rctx.lineTo(w, h);
+  rctx.stroke();
+  rctx.shadowBlur = 0;
+  // City silhouette
+  drawCity(w, h);
+  // Car
+  drawCar(w/2, h*0.75);
+  roadOffset = (roadOffset + roadSpeed) % 60;
+}
+function drawCity(w, h) {
+  rctx.fillStyle = 'rgba(0,20,40,0.8)';
+  const buildings = [[0.05,0.5,0.08,0.12],[0.15,0.48,0.07,0.15],[0.25,0.52,0.06,0.1],[0.65,0.5,0.07,0.13],[0.75,0.46,0.09,0.18],[0.85,0.52,0.06,0.1],[0.93,0.5,0.05,0.12]];
+  buildings.forEach(([x,y,bw,bh]) => {
+    rctx.fillStyle = 'rgba(5,15,30,0.9)';
+    rctx.fillRect(x*w, (y-bh)*h, bw*w, bh*h);
+    // Windows
+    rctx.fillStyle = `rgba(0,212,255,${Math.random()*0.3+0.1})`;
+    for(let i=0;i<3;i++) for(let j=0;j<4;j++) {
+      if(Math.random()>0.4) rctx.fillRect((x+0.01+i*0.02)*w, (y-bh+0.01+j*0.03)*h, 0.008*w, 0.015*h);
+    }
+  });
+}
+function drawCar(x, y) {
+  const s = 1.2;
+  rctx.save();
+  rctx.translate(x, y);
+  // Glow
+  rctx.shadowColor = '#00ff88'; rctx.shadowBlur = 20;
+  // Body
+  rctx.fillStyle = '#1a3a2a';
+  rctx.beginPath();
+  rctx.roundRect(-35*s, -15*s, 70*s, 25*s, 5);
+  rctx.fill();
+  rctx.fillStyle = '#0a2a1a';
+  rctx.beginPath();
+  rctx.roundRect(-20*s, -28*s, 40*s, 15*s, 4);
+  rctx.fill();
+  // Neon trim
+  rctx.strokeStyle = '#00ff88'; rctx.lineWidth = 1.5;
+  rctx.beginPath();
+  rctx.roundRect(-35*s, -15*s, 70*s, 25*s, 5);
+  rctx.stroke();
+  // Windows
+  rctx.fillStyle = 'rgba(0,212,255,0.3)';
+  rctx.fillRect(-16*s, -25*s, 32*s, 12*s);
+  // Wheels
+  [-25*s, 20*s].forEach(wx => {
+    rctx.fillStyle = '#111';
+    rctx.beginPath(); rctx.arc(wx, 10*s, 8*s, 0, Math.PI*2); rctx.fill();
+    rctx.strokeStyle = '#00d4ff'; rctx.lineWidth = 2;
+    rctx.stroke();
+  });
+  // Headlights
+  rctx.fillStyle = '#00ff88'; rctx.shadowBlur = 30;
+  rctx.beginPath(); rctx.ellipse(34*s, -5*s, 4, 3, 0, 0, Math.PI*2); rctx.fill();
+  rctx.restore();
+}
+window.addEventListener('resize', resizeRoad);
+resizeRoad();
+function gameLoop() { drawRoad(); requestAnimationFrame(gameLoop); }
+gameLoop();
+
+// ===================== QUESTIONS =====================
+// Add these new harder questions to the midQuestions array in mid-game.html
+const midQuestions = [
+  { 
+    q: "You have a list of invoices. You need to sum the total for 'Completed' orders that were over ₹10,000. Which formula is most efficient?", 
+    opts: ["=SUMIF(Status, 'Completed', Amount)", "=SUMIFS(Amount, Status, 'Completed', Amount, '>10000')", "=SUM(IF(Status='Completed', Amount))", "=COUNTIFS(Amount, '>10000')"], 
+    ans: 1, 
+    exp: "SUMIFS allows for multiple criteria (Status and Amount) and is more efficient than array formulas.", 
+    topic: "ADVANCED SUMIFS" 
+  },
+  { 
+    q: "If cell A1 contains 'EMSME-2024-DEPT', which formula extracts only the year '2024'?", 
+    opts: ["=MID(A1, 6, 4)", "=LEFT(A1, 4)", "=RIGHT(A1, 4)", "=SUBSTITUTE(A1, '2024', '')"], 
+    ans: 0, 
+    exp: "MID(text, start, num) starts at character 6 and takes 4 characters, resulting in '2024'.", 
+    topic: "TEXT EXTRACTION" 
+  },
+  { 
+    q: "A cell shows the error #NAME?. What is the most likely cause?", 
+    opts: ["Dividing by zero", "A misspelled function name or undefined range name", "A deleted cell reference", "The column is too narrow"], 
+    ans: 1, 
+    exp: "#NAME? occurs when Excel doesn't recognize text in a formula (e.g., =SUMM instead of =SUM).", 
+    topic: "ERROR AUDITING" 
+  },
+  { 
+    q: "Which function calculates the number of working days between two dates, excluding weekends and holidays?", 
+    opts: ["=DAYS()", "=WORKDAY()", "=NETWORKDAYS()", "=DATEDIF()"], 
+    ans: 2, 
+    exp: "NETWORKDAYS automatically excludes weekends and allows a range for holidays.", 
+    topic: "DATE ARITHMETIC" 
+  },
+  { 
+    q: "You want to find an exact match for a value using VLOOKUP, but the lookup column is NOT sorted. What must the 4th argument be?", 
+    opts: ["TRUE", "1", "FALSE or 0", "Leave it blank"], 
+    ans: 2, 
+    exp: "Using FALSE or 0 forces VLOOKUP to find an exact match regardless of sorting.", 
+    topic: "VLOOKUP LOGIC" 
+  },
+  { 
+    q: "What is the result of =AND(5>3, 2<1, 10=10)?", 
+    opts: ["TRUE", "FALSE", "#VALUE!", "TRUE, FALSE, TRUE"], 
+    ans: 1, 
+    exp: "The AND function only returns TRUE if ALL conditions are true. Since 2 is not less than 1, it returns FALSE.", 
+    topic: "LOGICAL OPERATORS" 
+  },
+  { 
+    q: "In Audit, you need to find the 2nd highest expense in a list (A1:A50). Which formula is best?", 
+    opts: ["=MAX(A1:A50)", "=LARGE(A1:A50, 2)", "=HIGH(A1:A50, 2)", "=RANK(A1:A50, 2)"], 
+    ans: 1, 
+    exp: "LARGE(range, k) returns the k-th largest value in a dataset.", 
+    topic: "STATISTICAL" 
+  },
+  { 
+    q: "How do you lock only the Column reference in a formula (so the column stays 'A' but the row can change)?", 
+    opts: ["$A$1", "A$1", "$A1", "A1"], 
+    ans: 2, 
+    exp: "The dollar sign ($) placed before the 'A' locks the column, while the row 1 remains relative.", 
+    topic: "CELL REFERENCING" 
+  },
+  { 
+    q: "What does the function =ISBLANK(A1) return if A1 contains a formula that results in an empty string (\"\")?", 
+    opts: ["TRUE", "FALSE", "#VALUE!", "0"], 
+    ans: 1, 
+    exp: "ISBLANK only returns TRUE if the cell is truly empty. A cell with a formula is not 'blank'.", 
+    topic: "LOGICAL CHECK" 
+  },
+  { 
+    q: "Which tool is best for removing duplicate rows based on 3 specific columns in a 5,000-row table?", 
+    opts: ["Filter", "Data Validation", "Remove Duplicates (Data Tab)", "Conditional Formatting"], 
+    ans: 2, 
+    exp: "Remove Duplicates allows you to select specific columns to define what a 'duplicate' is.", 
+    topic: "DATA CLEANING" 
+  },
+  { 
+    q: "=VLOOKUP(\"Raj*\", A1:B10, 2, 0). What does the asterisk (*) do?", 
+    opts: ["Multiplies the result", "Acts as a wildcard to find any text starting with 'Raj'", "Returns an error", "Finds only the word 'Raj*'"], 
+    ans: 1, 
+    exp: "Asterisk (*) is a wildcard for any number of characters. 'Raj*' finds Raj, Rajesh, Rajat, etc.", 
+    topic: "WILDCARDS" 
+  },
+  { 
+    q: "In a Pivot Table, how can you change a 'Sum of Salary' field to show the 'Average Salary' instead?", 
+    opts: ["Format Cells", "Value Field Settings", "Design Tab", "Conditional Formatting"], 
+    ans: 1, 
+    exp: "Value Field Settings allow you to change the calculation type (Sum, Count, Average, etc.).", 
+    topic: "PIVOT TABLES" 
+  },
+  { 
+    q: "Which formula converts the text '100' into a real number that can be added?", 
+    opts: ["=NUMBER(A1)", "=VALUE(A1)", "=TEXT(A1, '0')", "=CONVERT(A1)"], 
+    ans: 1, 
+    exp: "VALUE() converts a text string that represents a number into a numeric value.", 
+    topic: "DATA CONVERSION" 
+  },
+  { 
+    q: "You need to add a 12% tax to a price in A1, but only if the price is positive. Otherwise, show 0.", 
+    opts: ["=A1 * 1.12", "=IF(A1>0, A1*1.12, 0)", "=SUMIF(A1, '>0') * 0.12", "=MAX(0, A1) * 12%"], 
+    ans: 1, 
+    exp: "The IF function checks the condition (A1>0) before performing the calculation.", 
+    topic: "CONDITIONAL LOGIC" 
+  },
+  { 
+    q: "If cell A1 contains 'Accountant' and B1 contains 'Junior', which formula creates 'Junior-Accountant'?", 
+    opts: ["=B1-A1", "=B1 & \"-\" & A1", "=CONCAT(B1, A1)", "=JOIN(\"-\", B1, A1)"], 
+    ans: 1, 
+    exp: "The ampersand (&) combined with quotes (\"-\") joins the text and the separator.", 
+    topic: "CONCATENATION" 
+  },
+  { 
+    q: "What is the result of =ROUND(145.678, 1)?", 
+    opts: ["145.6", "145.7", "146", "145.68"], 
+    ans: 1, 
+    exp: "Rounding to 1 decimal place looks at the 2nd decimal (7), which rounds the 6 up to 7.", 
+    topic: "MATH FUNCTIONS" 
+  },
+  { 
+    q: "A Pivot Table isn't showing new rows you just added to your data source. What is the fastest fix?", 
+    opts: ["Restart Excel", "Delete the Pivot Table", "Change Data Source or Refresh (if in a Table)", "Re-type the new rows"], 
+    ans: 2, 
+    exp: "Refreshing updates the Pivot, but 'Change Data Source' ensures the new range is included.", 
+    topic: "PIVOT TABLES" 
+  },
+  { 
+    q: "Which error occurs if a formula refers to a cell that has been deleted?", 
+    opts: ["#VALUE!", "#REF!", "#NULL!", "#DIV/0!"], 
+    ans: 1, 
+    exp: "#REF! stands for Reference and occurs when a cell link is broken.", 
+    topic: "ERROR HANDLING" 
+  },
+  { 
+    q: "What does =IFERROR(10/0, \"Check Data\") display?", 
+    opts: ["#DIV/0!", "0", "Check Data", "Blank"], 
+    ans: 2, 
+    exp: "IFERROR catches the division by zero error and shows the custom text instead.", 
+    topic: "ERROR HANDLING" 
+  },
+  { 
+    q: "In the formula =VLOOKUP(H2, A1:E10, 5, 0), what does the '5' represent?", 
+    opts: ["The 5th row in the range", "The 5th column in the table array (Column E)", "The value 5", "An approximate match"], 
+    ans: 1, 
+    exp: "The 3rd argument is the Column Index Number; 5 means it will return data from Column E.", 
+    topic: "VLOOKUP" 
+  },
+  { 
+    q: "How can you quickly highlight all cells in a column that are greater than ₹50,000?", 
+    opts: ["Data Validation", "Sorting", "Conditional Formatting", "Goal Seek"], 
+    ans: 2, 
+    exp: "Conditional Formatting automatically changes cell appearance based on values.", 
+    topic: "FORMATTING" 
+  },
+  { 
+    q: "Which function returns the position of a specific character in a string (e.g., finding where '@' is in an email)?", 
+    opts: ["=LOCATE()", "=FIND()", "=PLACE()", "=WHICH()"], 
+    ans: 1, 
+    exp: "FIND(find_text, within_text) returns the starting position of the text string.", 
+    topic: "TEXT FUNCTIONS" 
+  },
+  { 
+    q: "To convert a column of vertical names into a horizontal row, which feature is used?", 
+    opts: ["Wrap Text", "Merge Cells", "Paste Special -> Transpose", "Orientation"], 
+    ans: 2, 
+    exp: "Transpose switches the orientation of data from vertical to horizontal or vice versa.", 
+    topic: "DATA TOOLS" 
+  },
+  { 
+    q: "Which formula calculates the total number of cells containing ANY value (not just numbers) in range A1:A10?", 
+    opts: ["=COUNT(A1:A10)", "=COUNTA(A1:A10)", "=COUNTIF(A1:A10)", "=SUM(A1:A10)"], 
+    ans: 1, 
+    exp: "COUNTA counts 'All' non-empty cells (numbers, text, logicals, etc.).", 
+    topic: "COUNTING" 
+  },
+  { 
+    q: "What happens if you press Ctrl + ; (Semicolon) in Excel?", 
+    opts: ["Inserts current time", "Inserts current date", "Selects the whole column", "Deletes the row"], 
+    ans: 1, 
+    exp: "Ctrl + ; is the shortcut for the current static date. (Ctrl + Shift + ; is for time).", 
+    topic: "SHORTCUTS" 
+  }
+];
+
+// ===================== GAME STATE =====================
+let currentQ = 0, score = 0, correct = 0, answered = false;
+let userAnswers = [];
+let timeLeft = 30 * 60;
+let timerInterval;
+let startTime = Date.now();
+const TOTAL = 25;
+
+const userData = JSON.parse(sessionStorage.getItem('userData') || '{"name":"Player","dept":""}');
+document.getElementById('hud-user').textContent = userData.name + ' · ' + userData.dept;
+
+function renderQuestion() {
+  const q = midQuestions[currentQ];
+  document.getElementById('hud-qnum').textContent = `${currentQ+1} / 25`;
+  document.getElementById('q-num-display').textContent = `Q${currentQ+1} of 25`;
+  document.getElementById('q-topic').textContent = q.topic;
+  document.getElementById('q-text').textContent = q.q;
+  document.getElementById('road-progress').style.width = `${Math.max(4,(currentQ/TOTAL)*100)}%`;
+  const container = document.getElementById('options-container');
+  container.innerHTML = '';
+  ['A','B','C','D'].forEach((lbl, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'opt-btn';
+    btn.innerHTML = `<span class="opt-label">${lbl}</span>${q.opts[i]}`;
+    btn.onclick = () => selectAnswer(i, btn);
+    container.appendChild(btn);
+  });
+  document.getElementById('explanation-box').style.display = 'none';
+  document.getElementById('next-btn').style.display = 'none';
+  answered = false;
+  // Animate card
+  const card = document.getElementById('q-card');
+  card.style.opacity = '0'; card.style.transform = 'translateX(30px)';
+  setTimeout(() => { card.style.transition = 'all 0.4s ease'; card.style.opacity = '1'; card.style.transform = 'translateX(0)'; }, 50);
+}
+
+function selectAnswer(idx, clickedBtn) {
+  if (answered) return;
+  answered = true;
+  const q = midQuestions[currentQ];
+  const allBtns = document.querySelectorAll('.opt-btn');
+  allBtns.forEach(b => b.classList.add('disabled'));
+  const isCorrect = idx === q.ans;
+  userAnswers.push({ qIdx: currentQ, userAns: idx, correct: isCorrect });
+  if (isCorrect) {
+    clickedBtn.classList.add('correct');
+    score += 5; correct++;
+    document.getElementById('hud-score').textContent = score;
+    document.getElementById('hud-correct').textContent = correct;
+    roadSpeed = Math.min(8, roadSpeed + 1);
+    updateSpeed(Math.min(100, parseInt(document.getElementById('speed-val').textContent) + 15));
+    showScorePopup('+5', '#00ff88');
+    flash('green');
+    showSpeedLines();
+  } else {
+    clickedBtn.classList.add('wrong');
+    allBtns[q.ans].classList.add('correct');
+    roadSpeed = Math.max(1, roadSpeed - 1);
+    updateSpeed(Math.max(10, parseInt(document.getElementById('speed-val').textContent) - 20));
+    showScorePopup('SLOW!', '#ff3c3c');
+    flash('red');
+  }
+  document.getElementById('explanation-text').textContent = q.exp;
+  document.getElementById('explanation-box').style.display = 'block';
+  document.getElementById('next-btn').style.display = 'block';
+}
+
+function updateSpeed(val) {
+  document.getElementById('speed-fill').style.width = val + '%';
+  document.getElementById('speed-val').textContent = val + '%';
+}
+
+function showScorePopup(text, color) {
+  const popup = document.getElementById('score-popup');
+  popup.textContent = text;
+  popup.style.color = color;
+  popup.style.textShadow = `0 0 20px ${color}`;
+  popup.classList.add('show');
+  setTimeout(() => { popup.classList.remove('show'); popup.classList.add('hide'); setTimeout(() => popup.classList.remove('hide'), 300); }, 1000);
+}
+
+function flash(type) {
+  const el = document.getElementById('flash');
+  el.className = `flash-overlay ${type}`;
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 300);
+}
+
+function showSpeedLines() {
+  const sl = document.getElementById('speed-lines');
+  sl.classList.add('active');
+  setTimeout(() => sl.classList.remove('active'), 600);
+}
+
+function nextQuestion() {
+  if (currentQ < TOTAL - 1) {
+    currentQ++;
+    renderQuestion();
+  } else {
+    endGame();
+  }
+}
+
+// ===================== TIMER =====================
+function startTimer() {
+  updateTimerDisplay();
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimerDisplay();
+    if (timeLeft <= 0) { clearInterval(timerInterval); endGame(); }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(timeLeft / 60);
+  const s = timeLeft % 60;
+  document.getElementById('timer-display').textContent = `${m}:${s.toString().padStart(2,'0')}`;
+  const pct = timeLeft / (30*60);
+  const circumference = 150.8;
+  const offset = circumference * (1 - pct);
+  document.getElementById('timer-ring-fill').style.strokeDashoffset = offset;
+  const ring = document.getElementById('timer-ring-fill');
+  if (pct < 0.2) { ring.style.stroke = '#ff3c3c'; }
+  else if (pct < 0.5) { ring.style.stroke = '#ffaa00'; }
+  else { ring.style.stroke = '#00d4ff'; }
+}
+
+// ===================== END GAME =====================
+const SHEETS_URL = 'https://defaultf085025b86d343c3860c4a537cc98b.fc.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/dea35cd3e8ae43ab86b81671a1465890/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=zXPQzOtaW930NNZZVU365qhDz57c8imRXBSzyDav__g';
+
+function endGame() {
+  clearInterval(timerInterval);   // ✅ correct variable
+
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+
+  const res = {
+    name: userData.name,
+    empId: userData.empId || '',
+    dept: userData.dept || '',
+    mode: 'Mid-Level',
+    score,
+    correct,
+    accuracy: Math.round(correct / 25 * 100),
+    timeTaken: `${Math.floor(elapsed/60)}m ${elapsed%60}s`,
+    rank: score >= 100 ? 'Expert' : score >= 60 ? 'Intermediate' : 'Beginner',
+    timestamp: new Date().toISOString()
+  };
+
+  fetch(SHEETS_URL, {
+   method: 'POST',
+   headers: {
+    'Content-Type': 'application/json'
+   },
+   body: JSON.stringify(res)
+  })
+  .then(response => response.json())
+  .then(data => console.log('Success:', data))
+  .catch(error => console.error('Error:', error));
+
+  sessionStorage.setItem('gameResult', JSON.stringify({
+    ...res,
+    userAnswers,
+    questions: midQuestions   // ✅ correct
+  }));
+
+  const all = JSON.parse(localStorage.getItem('assessmentResults') || '[]');
+  all.push(res);
+  localStorage.setItem('assessmentResults', JSON.stringify(all));
+
+  setTimeout(() => {
+  window.location.href = 'result.html';
+}, 500);
+
+}
+// Init
+renderQuestion();
+startTimer();
+</script>
+</body>
+</html>

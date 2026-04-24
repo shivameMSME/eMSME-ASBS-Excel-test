@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>High-Level Game | EMSME & ASBS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --neon-purple:#b44fff; --neon-red:#ff3c60; --neon-blue:#00d4ff; --dark-bg:#060008; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Rajdhani',sans-serif; background:var(--dark-bg); min-height:100vh; color:#e0d0ff; overflow-x:hidden; }
+  .orbitron { font-family:'Orbitron',sans-serif; }
+
+  /* Battle canvas */
+  #battle-canvas { position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; }
+  .content-overlay { position:relative; z-index:10; }
+
+  /* HUD */
+  .hud-bar { background:rgba(6,0,8,0.92); border-bottom:1px solid rgba(180,79,255,0.3); padding:10px 20px; backdrop-filter:blur(10px); }
+
+  /* Health bars */
+  .health-bar-container { flex:1; }
+  .health-label { font-family:'Orbitron',sans-serif; font-size:10px; letter-spacing:1px; margin-bottom:4px; }
+  .health-bar { height:14px; border-radius:7px; background:rgba(255,255,255,0.08); position:relative; overflow:hidden; border:1px solid rgba(255,255,255,0.1); }
+  .health-fill { height:100%; border-radius:7px; transition:width 0.4s ease; position:relative; }
+  .health-fill.player { background:linear-gradient(90deg,#00ff88,#00d4ff); box-shadow:0 0 10px rgba(0,255,136,0.5); }
+  .health-fill.enemy { background:linear-gradient(90deg,#ff3c60,#b44fff); box-shadow:0 0 10px rgba(255,60,96,0.5); }
+
+  /* Timer */
+  .timer-ring { position:relative; display:inline-flex; align-items:center; justify-content:center; }
+  svg.timer-svg { transform:rotate(-90deg); }
+  .timer-text { position:absolute; font-family:'Orbitron',sans-serif; font-size:15px; font-weight:700; color:#b44fff; }
+
+  /* Question card */
+  .q-card {
+    background:rgba(10,0,18,0.95);
+    border:1px solid rgba(180,79,255,0.35);
+    border-radius:16px;
+    backdrop-filter:blur(20px);
+    padding:28px;
+    position:relative;
+    overflow:hidden;
+  }
+  .q-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    background:linear-gradient(90deg,transparent,#b44fff,#ff3c60,transparent);
+    animation:scanLine 2s linear infinite;
+  }
+  @keyframes scanLine { 0%{opacity:0.4} 50%{opacity:1} 100%{opacity:0.4} }
+
+  /* Options */
+  .opt-btn {
+    background:rgba(180,79,255,0.05);
+    border:1px solid rgba(180,79,255,0.25);
+    border-radius:10px;
+    padding:14px 18px;
+    width:100%;
+    text-align:left;
+    color:#e0d0ff;
+    cursor:pointer;
+    transition:all 0.25s;
+    font-family:'Rajdhani',sans-serif;
+    font-size:15px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .opt-btn:hover:not(.disabled) { background:rgba(180,79,255,0.15); border-color:#b44fff; transform:translateX(4px); }
+  .opt-btn.correct { background:rgba(0,255,136,0.2)!important; border-color:#00ff88!important; color:#00ff88!important; }
+  .opt-btn.wrong { background:rgba(255,60,60,0.2)!important; border-color:#ff3c3c!important; color:#ff3c3c!important; }
+  .opt-btn.disabled { pointer-events:none; }
+  .opt-label { font-family:'Orbitron',sans-serif; font-size:12px; font-weight:700; color:rgba(180,79,255,0.8); min-width:24px; }
+
+  /* Explanation */
+  .explanation-box {
+    background:rgba(180,79,255,0.07);
+    border:1px solid rgba(180,79,255,0.3);
+    border-radius:10px;
+    padding:14px;
+    margin-top:16px;
+    font-size:14px;
+    color:rgba(224,208,255,0.85);
+    display:none;
+    animation:fadeIn 0.4s ease;
+  }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  /* Difficulty badge */
+  .diff-badge { background:rgba(255,60,96,0.1); border:1px solid rgba(255,60,96,0.4); border-radius:6px; padding:2px 10px; font-size:12px; color:#ff3c60; font-family:'Orbitron',sans-serif; display:inline-block; margin-bottom:10px; }
+
+  /* Q pill */
+  .q-pill { background:rgba(180,79,255,0.1); border:1px solid rgba(180,79,255,0.4); border-radius:20px; padding:4px 14px; font-family:'Orbitron',sans-serif; font-size:11px; color:#b44fff; display:inline-block; }
+
+  /* Flash */
+  .flash-overlay { position:fixed; inset:0; z-index:50; pointer-events:none; opacity:0; transition:opacity 0.2s; }
+
+  /* Next button */
+  .nxt-btn {
+    background:linear-gradient(135deg,rgba(180,79,255,0.2),rgba(180,79,255,0.05));
+    border:2px solid #b44fff;
+    color:#b44fff;
+    font-family:'Orbitron',sans-serif;
+    font-weight:700;
+    border-radius:8px;
+    padding:12px 28px;
+    cursor:pointer;
+    transition:all 0.3s;
+    letter-spacing:2px;
+    display:none;
+  }
+  .nxt-btn:hover { box-shadow:0 0 25px rgba(180,79,255,0.5); transform:translateY(-2px); }
+
+  /* Combat text */
+  .combat-popup { position:fixed; top:40%; left:50%; transform:translate(-50%,-50%) scale(0); z-index:60; font-family:'Orbitron',sans-serif; font-size:32px; font-weight:900; transition:all 0.3s; pointer-events:none; text-align:center; }
+  .combat-popup.show { transform:translate(-50%,-50%) scale(1); }
+  .combat-popup.hide { transform:translate(-50%,-120%) scale(0); opacity:0; }
+
+  /* Shake animation */
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
+  .shake { animation:shake 0.4s ease; }
+
+  /* Particle burst */
+  .burst { position:fixed; pointer-events:none; z-index:55; }
+
+  /* Progress bar */
+  .q-progress { height:4px; background:rgba(180,79,255,0.15); border-radius:2px; }
+  .q-progress-fill { height:100%; background:linear-gradient(90deg,#b44fff,#ff3c60); border-radius:2px; transition:width 0.5s ease; }
+</style>
+</head>
+<body>
+
+<!-- Battle canvas -->
+<canvas id="battle-canvas"></canvas>
+<div class="flash-overlay" id="flash"></div>
+<div class="combat-popup" id="combat-popup"></div>
+
+<div class="content-overlay min-h-screen flex flex-col">
+
+  <!-- HUD Top -->
+  <div class="hud-bar">
+    <div class="flex items-center gap-4 flex-wrap">
+      <!-- Player Health -->
+      <div class="health-bar-container">
+        <div class="health-label" style="color:#00ff88">⚔️ <span id="player-name-hud">PLAYER</span></div>
+        <div class="health-bar">
+          <div class="health-fill player" id="player-health" style="width:100%"></div>
+        </div>
+        <div class="text-xs mt-1 orbitron" style="color:#00ff88"><span id="player-hp">500</span>/500</div>
+      </div>
+      <!-- Center: VS + Timer -->
+      <div class="text-center px-3 flex-shrink-0">
+        <div class="orbitron text-xs" style="color:#b44fff">HIGH-LEVEL</div>
+        <div style="font-size:24px">⚔️</div>
+        <div class="timer-ring">
+          <svg class="timer-svg" width="52" height="52" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(180,79,255,0.15)" stroke-width="4"/>
+            <circle id="timer-ring-fill" cx="26" cy="26" r="22" fill="none" stroke="#b44fff" stroke-width="4" stroke-dasharray="138.2" stroke-dashoffset="0" style="transition:stroke-dashoffset 1s linear,stroke 0.5s"/>
+          </svg>
+          <span class="timer-text" id="timer-display">30:00</span>
+        </div>
+      </div>
+      <!-- Enemy Health -->
+      <div class="health-bar-container">
+        <div class="health-label text-right" style="color:#ff3c60">EXCEL BOSS 👾</div>
+        <div class="health-bar">
+          <div class="health-fill enemy" id="enemy-health" style="width:100%"></div>
+        </div>
+        <div class="text-xs mt-1 orbitron text-right" style="color:#ff3c60"><span id="enemy-hp">500</span>/500</div>
+      </div>
+    </div>
+    <!-- Stats row -->
+    <div class="flex items-center justify-between mt-2 flex-wrap gap-2">
+      <div class="flex gap-4">
+        <div class="text-xs"><span style="color:rgba(180,79,255,0.6)" class="orbitron">SCORE</span> <span class="orbitron" style="color:#b44fff" id="hud-score">0</span></div>
+        <div class="text-xs"><span style="color:rgba(0,255,136,0.6)" class="orbitron">HITS</span> <span class="orbitron" style="color:#00ff88" id="hud-correct">0</span></div>
+        <div class="text-xs"><span style="color:rgba(255,60,96,0.6)" class="orbitron">Q</span> <span class="orbitron" style="color:#ff3c60" id="hud-qnum">1/25</span></div>
+      </div>
+      <!-- Progress -->
+      <div class="flex-1 max-w-48">
+        <div class="q-progress"><div class="q-progress-fill" id="q-progress" style="width:4%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Question Area -->
+  <div class="flex-1 flex items-center justify-center p-4">
+    <div class="w-full max-w-2xl">
+      <div class="q-card" id="q-card">
+        <div class="flex items-center justify-between mb-4">
+          <div class="q-pill" id="q-num-display">Q1 of 25</div>
+          <div class="diff-badge" id="q-topic">ADVANCED EXCEL</div>
+        </div>
+        <h2 class="text-lg md:text-xl font-semibold mb-6 leading-relaxed" id="q-text" style="color:#e0d0ff">Loading...</h2>
+        <div class="space-y-3" id="options-container"></div>
+        <div class="explanation-box" id="explanation-box">
+          <span style="color:#b44fff;font-weight:600;">💡 Explanation: </span><span id="explanation-text"></span>
+        </div>
+        <div class="mt-5 flex justify-end">
+          <button class="nxt-btn" id="next-btn" onclick="nextQuestion()">NEXT FIGHT →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== BATTLE CANVAS =====================
+const battleCanvas = document.getElementById('battle-canvas');
+const bctx = battleCanvas.getContext('2d');
+let frameCount = 0;
+let playerAttacking = false, enemyShaking = false;
+let playerDamage = false;
+let particles = [];
+
+function resizeBattle() { battleCanvas.width = window.innerWidth; battleCanvas.height = window.innerHeight; }
+
+function drawBattle() {
+  const w = battleCanvas.width, h = battleCanvas.height;
+  bctx.clearRect(0, 0, w, h);
+
+  // Dark atmospheric background
+  const bgGrad = bctx.createLinearGradient(0, 0, 0, h);
+  bgGrad.addColorStop(0, '#060008');
+  bgGrad.addColorStop(0.6, '#0d000f');
+  bgGrad.addColorStop(1, '#180020');
+  bctx.fillStyle = bgGrad;
+  bctx.fillRect(0, 0, w, h);
+
+  // Ground
+  const groundGrad = bctx.createLinearGradient(0, h*0.7, 0, h);
+  groundGrad.addColorStop(0, 'rgba(80,0,100,0.4)');
+  groundGrad.addColorStop(1, 'rgba(20,0,30,0.8)');
+  bctx.fillStyle = groundGrad;
+  bctx.fillRect(0, h*0.7, w, h*0.3);
+
+  // Ground glow line
+  bctx.shadowColor = '#b44fff';
+  bctx.shadowBlur = 20;
+  bctx.strokeStyle = 'rgba(180,79,255,0.5)';
+  bctx.lineWidth = 2;
+  bctx.beginPath(); bctx.moveTo(0, h*0.7); bctx.lineTo(w, h*0.7); bctx.stroke();
+  bctx.shadowBlur = 0;
+
+  // Floating runes/circles in background
+  for (let i = 0; i < 5; i++) {
+    const x = (w * (i+1)) / 6;
+    const y = h * 0.35;
+    const r = 30 + Math.sin(frameCount*0.02 + i) * 5;
+    bctx.strokeStyle = `rgba(180,79,255,${0.05 + Math.sin(frameCount*0.03+i)*0.03})`;
+    bctx.lineWidth = 1;
+    bctx.beginPath(); bctx.arc(x, y, r, 0, Math.PI*2); bctx.stroke();
+    bctx.beginPath(); bctx.arc(x, y, r*0.6, 0, Math.PI*2); bctx.stroke();
+  }
+
+  // Player character (left)
+  drawPlayer(w*0.2, h*0.68, playerAttacking, playerDamage);
+  // Enemy character (right)
+  drawEnemy(w*0.78, h*0.68, enemyShaking);
+
+  // VS text
+  bctx.font = `bold 28px 'Orbitron', sans-serif`;
+  bctx.fillStyle = `rgba(180,79,255,${0.4 + Math.sin(frameCount*0.05)*0.2})`;
+  bctx.textAlign = 'center';
+  bctx.shadowColor = '#b44fff'; bctx.shadowBlur = 15;
+  bctx.fillText('VS', w*0.5, h*0.5);
+  bctx.shadowBlur = 0;
+
+  // Attack beam
+  if (playerAttacking) {
+    const beamGrad = bctx.createLinearGradient(w*0.28, h*0.62, w*0.72, h*0.62);
+    beamGrad.addColorStop(0, 'rgba(0,255,136,0.9)');
+    beamGrad.addColorStop(1, 'rgba(0,255,136,0)');
+    bctx.fillStyle = beamGrad;
+    bctx.fillRect(w*0.28, h*0.6, w*0.44, 8);
+    bctx.shadowColor = '#00ff88'; bctx.shadowBlur = 20;
+    bctx.fillRect(w*0.28, h*0.62, w*0.44, 4);
+    bctx.shadowBlur = 0;
+  }
+
+  // Damage shockwave on enemy
+  if (enemyShaking) {
+    bctx.strokeStyle = `rgba(255,60,96,${0.6 - (frameCount%20)*0.03})`;
+    bctx.lineWidth = 3;
+    bctx.beginPath(); bctx.arc(w*0.78, h*0.62, 50 + (frameCount%20)*3, 0, Math.PI*2); bctx.stroke();
+  }
+
+  // Particles
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => {
+    bctx.globalAlpha = p.life/p.maxLife;
+    bctx.fillStyle = p.color;
+    bctx.beginPath(); bctx.arc(p.x, p.y, p.r, 0, Math.PI*2); bctx.fill();
+    p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--;
+  });
+  bctx.globalAlpha = 1;
+
+  frameCount++;
+  if (frameCount > 1000) frameCount = 0;
+  requestAnimationFrame(drawBattle);
+}
+
+function drawPlayer(x, y, attacking, damaged) {
+  bctx.save();
+  const bobY = Math.sin(frameCount * 0.06) * 3;
+  const atkX = attacking ? 30 : 0;
+  bctx.translate(x + atkX, y + bobY);
+  bctx.shadowColor = damaged ? '#ff3c60' : '#00ff88';
+  bctx.shadowBlur = damaged ? 30 : 15;
+  // Body
+  bctx.fillStyle = damaged ? '#3a0010' : '#0a2a1a';
+  bctx.fillRect(-18, -55, 36, 45);
+  // Neon trim
+  bctx.strokeStyle = damaged ? '#ff3c60' : '#00ff88';
+  bctx.lineWidth = 2;
+  bctx.strokeRect(-18, -55, 36, 45);
+  // Head
+  bctx.fillStyle = damaged ? '#4a0015' : '#0d3520';
+  bctx.beginPath(); bctx.roundRect(-14, -78, 28, 25, 6); bctx.fill();
+  bctx.stroke();
+  // Visor
+  bctx.fillStyle = damaged ? 'rgba(255,60,96,0.5)' : 'rgba(0,255,136,0.5)';
+  bctx.fillRect(-11, -72, 22, 8);
+  // Sword arm
+  bctx.strokeStyle = '#00d4ff'; bctx.lineWidth = 3;
+  bctx.beginPath();
+  bctx.moveTo(18, -40);
+  bctx.lineTo(attacking ? 70 : 45, attacking ? -45 : -35);
+  bctx.stroke();
+  bctx.shadowBlur = 0;
+  bctx.restore();
+}
+
+function drawEnemy(x, y, shaking) {
+  bctx.save();
+  const bobY = Math.sin(frameCount * 0.05 + 1) * 4;
+  const shakeX = shaking ? Math.sin(frameCount * 0.5) * 8 : 0;
+  bctx.translate(x + shakeX, y + bobY);
+  bctx.shadowColor = '#ff3c60';
+  bctx.shadowBlur = 20;
+  // Body
+  bctx.fillStyle = '#2a0010';
+  bctx.beginPath();
+  bctx.moveTo(0, -65); bctx.lineTo(22, -30); bctx.lineTo(22, 0); bctx.lineTo(-22, 0); bctx.lineTo(-22, -30);
+  bctx.closePath(); bctx.fill();
+  bctx.strokeStyle = '#ff3c60'; bctx.lineWidth = 2; bctx.stroke();
+  // Head
+  bctx.fillStyle = '#3a0018';
+  bctx.beginPath(); bctx.roundRect(-16, -90, 32, 28, 4); bctx.fill(); bctx.stroke();
+  // Glowing eyes
+  bctx.shadowColor = '#ff3c60'; bctx.shadowBlur = 15;
+  bctx.fillStyle = '#ff3c60';
+  bctx.beginPath(); bctx.ellipse(-6, -78, 4, 4, 0, 0, Math.PI*2); bctx.fill();
+  bctx.beginPath(); bctx.ellipse(6, -78, 4, 4, 0, 0, Math.PI*2); bctx.fill();
+  // Horns
+  bctx.fillStyle = '#4a0020';
+  bctx.beginPath(); bctx.moveTo(-10,-90); bctx.lineTo(-5,-108); bctx.lineTo(0,-88); bctx.fill();
+  bctx.beginPath(); bctx.moveTo(10,-90); bctx.lineTo(5,-108); bctx.lineTo(0,-88); bctx.fill();
+  bctx.shadowBlur = 0;
+  bctx.restore();
+}
+
+window.addEventListener('resize', resizeBattle);
+resizeBattle();
+drawBattle();
+
+// ===================== QUESTIONS =====================
+const highQuestions = [
+  { 
+    q: "In =XLOOKUP(\"*\", A1:A10, B1:B10, \"None\", 2, -1), what does the formula return?", 
+    opts: [
+      "The value in B corresponding to the last non-empty cell in A", 
+      "The value in B corresponding to the first cell in A", 
+      "The text 'None' if any cell in A contains a number", 
+      "The character '*' if it exists in the range A1:A10"
+    ], 
+    ans: 0, 
+    exp: "Match mode '2' enables wildcards. '*' matches any text. Search mode '-1' searches last-to-first, effectively finding the bottom-most text entry.", 
+    topic: "XLOOKUP" 
+  },
+  { 
+    q: "Which INDEX-MATCH formula correctly performs a lookup for 'Dept A' in Col A AND 'Shift 1' in Col B, returning the salary in Col C?", 
+    opts: [
+      "=INDEX(C:C, MATCH(1, (A:A=\"Dept A\")*(B:B=\"Shift 1\"), 0))", 
+      "=INDEX(C:C, MATCH(\"Dept A\"&\"Shift 1\", A:A&B:B, 0))", 
+      "=INDEX(C:C, MATCH(1, (A:A=\"Dept A\")+(B:B=\"Shift 1\"), 0))", 
+      "=VLOOKUP(1, (A:A=\"Dept A\")*(B:B=\"Shift 1\"), 3, 0)"
+    ], 
+    ans: 0, 
+    exp: "Multiplying two boolean arrays (TRUE/FALSE) results in an array of 1s and 0s. MATCH finds the '1' where both criteria are TRUE.", 
+    topic: "INDEX + MATCH" 
+  },
+  { 
+    q: "If A1:A10 contains numbers, what is the result of =SUMPRODUCT(1/COUNTIF(A1:A10, A1:A10))?", 
+    opts: [
+      "The count of unique values in the range", 
+      "The sum of all numbers in the range", 
+      "The average of all values in the range", 
+      "A #DIV/0! error if the range is sorted"
+    ], 
+    ans: 0, 
+    exp: "This is a classic 'Unique Count' formula. It sums the fractional occurrence of each value (e.g., three '5's each count as 1/3, totaling 1).", 
+    topic: "SUMPRODUCT" 
+  },
+  { 
+    q: "How do you FILTER Table1 to show rows where the Name (Col A) contains the letter 'z' (case-insensitive)?", 
+    opts: [
+      "=FILTER(Table1, ISNUMBER(SEARCH(\"z\", Table1[Name])))", 
+      "=FILTER(Table1, Table1[Name]=\"*z*\")", 
+      "=FILTER(Table1, FIND(\"z\", Table1[Name]))", 
+      "=FILTER(Table1, SEARCH(\"z\", Table1[Name])=\"z\")"
+    ], 
+    ans: 0, 
+    exp: "FILTER requires a boolean array. SEARCH returns a number if found; ISNUMBER converts those numbers to TRUE/FALSE.", 
+    topic: "FILTER" 
+  },
+  { 
+    q: "You work a custom shift: Monday, Wednesday, and Friday only. What is the NETWORKDAYS.INTL weekend string?", 
+    opts: [
+      "\"0101011\"", 
+      "\"1010100\"", 
+      "\"0101010\"", 
+      "\"1010111\""
+    ], 
+    ans: 0, 
+    exp: "The string starts on Monday. '0' is a workday, '1' is a weekend. Mon(0), Tue(1), Wed(0), Thu(1), Fri(0), Sat(1), Sun(1).", 
+    topic: "NETWORKDAYS" 
+  },
+  { 
+    q: "What does =EOMONTH(DATE(2023,12,31), 2) + 1 return?", 
+    opts: [
+      "March 1, 2024", 
+      "February 29, 2024", 
+      "March 31, 2024", 
+      "February 1, 2024"
+    ], 
+    ans: 0, 
+    exp: "EOMONTH adds 2 months (Feb 2024). The end of Feb 2024 is the 29th. Adding 1 results in March 1st.", 
+    topic: "EOMONTH" 
+  },
+  { 
+    q: "To merge Col A and Col B with a hyphen, but only for rows where Col C is > 100, which formula is correct?", 
+    opts: [
+      "=TEXTJOIN(\"-\", TRUE, FILTER(A1:B10, C1:C10>100))", 
+      "=FILTER(TEXTJOIN(\"-\", TRUE, A1:B10), C1:C10>100)", 
+      "=TEXTJOIN(\"-\", TRUE, IF(C1:C10>100, A1:B10, \"\"))", 
+      "None of the above"
+    ], 
+    ans: 0, 
+    exp: "FILTER returns the two-column array of matching rows, and TEXTJOIN combines them across the rows and columns.", 
+    topic: "TEXTJOIN" 
+  },
+  { 
+    q: "If A1 = 'Alpha,Beta,Gamma', what does =TEXTSPLIT(A1, , \",\") return?", 
+    opts: [
+      "A vertical array in 3 rows", 
+      "A horizontal array in 3 columns", 
+      "A single cell with no commas", 
+      "An error because the 2nd argument is empty"
+    ], 
+    ans: 0, 
+    exp: "In TEXTSPLIT, the 2nd argument is the column delimiter. Skipping it and using the 3rd argument splits into rows.", 
+    topic: "TEXTSPLIT" 
+  },
+  { 
+    q: "Result of =PROPER(\"3rd-place win-class\")?", 
+    opts: [
+      "3Rd-Place Win-Class", 
+      "3rd-Place Win-Class", 
+      "3Rd-place Win-class", 
+      "3rd-place win-class"
+    ], 
+    ans: 0, 
+    exp: "PROPER capitalizes every letter following a non-letter. Since '3' and '-' are non-letters, 'r', 'p', 'w', and 'c' are capitalized.", 
+    topic: "PROPER" 
+  },
+  { 
+    q: "Which error is produced if =XLOOKUP is asked to search for a value in a range that was deleted?", 
+    opts: [
+      "#REF!", 
+      "#N/A", 
+      "#VALUE!", 
+      "#NAME?"
+    ], 
+    ans: 0, 
+    exp: "Deleting a row/column that is directly referenced in a formula range always results in a Reference error.", 
+    topic: "Error Handling" 
+  },
+  { 
+    q: "How does =SUMPRODUCT(--(A1:A10=\"Yes\")) differ from =SUMPRODUCT(A1:A10=\"Yes\")?", 
+    opts: [
+      "The second one returns 0 because it doesn't convert Booleans", 
+      "There is no difference in Excel 365", 
+      "The first one is slower but more accurate", 
+      "The second one sums the lengths of the strings"
+    ], 
+    ans: 0, 
+    exp: "SUMPRODUCT ignores non-numeric values. TRUE/FALSE are booleans. '--' coerces them into 1s and 0s.", 
+    topic: "SUMPRODUCT" 
+  },
+  { 
+    q: "What is the result of =INDEX(A1:C10, 0, 2)?", 
+    opts: [
+      "The entire second column (B1:B10)", 
+      "A #VALUE! error", 
+      "The cell B1 only", 
+      "The header of the second column"
+    ], 
+    ans: 0, 
+    exp: "Setting Row_Num to 0 in INDEX returns the entire column reference (Spill array).", 
+    topic: "INDEX + MATCH" 
+  },
+  { 
+    q: "Which logical function is best to check if A1 is either 'Red', 'Blue', or 'Green'?", 
+    opts: [
+      "=OR(A1={\"Red\",\"Blue\",\"Green\"})", 
+      "=AND(A1=\"Red\", A1=\"Blue\", A1=\"Green\")", 
+      "=XLOOKUP(A1, {\"Red\",\"Blue\",\"Green\"}, {1,1,1})", 
+      "=IF(A1=\"Red\"&\"Blue\"&\"Green\", 1, 0)"
+    ], 
+    ans: 0, 
+    exp: "Using an array constant within OR() checks the cell against multiple values simultaneously.", 
+    topic: "Advanced IF" 
+  },
+  { 
+    q: "To split a string by a comma but IGNORE empty results, which TEXTSPLIT argument is used?", 
+    opts: [
+      "The 4th argument [ignore_empty]", 
+      "The 3rd argument [row_delimiter]", 
+      "The 5th argument [match_mode]", 
+      "The 2nd argument [col_delimiter]"
+    ], 
+    ans: 0, 
+    exp: "TEXTSPLIT(text, col_delim, row_delim, [ignore_empty]). Setting the 4th argument to TRUE removes gaps.", 
+    topic: "TEXTSPLIT" 
+  },
+  { 
+    q: "What happens if =IFS(A1>10, \"High\", A1>5, \"Mid\") is evaluated for A1 = 12?", 
+    opts: [
+      "Returns 'High'", 
+      "Returns 'High' and 'Mid' in two cells", 
+      "Returns an error", 
+      "Returns 'Mid'"
+    ], 
+    ans: 0, 
+    exp: "IFS stops at the first condition that is TRUE. Even though 12 is > 5, it stops at > 10.", 
+    topic: "Nested IF" 
+  },
+  { 
+    q: "Result of =XLOOKUP(2, {1,3,2,4,2}, {\"A\",\"B\",\"C\",\"D\",\"E\"}, , 0, -1)?", 
+    opts: [
+      "E", 
+      "C", 
+      "B", 
+      "None"
+    ], 
+    ans: 0, 
+    exp: "Search mode -1 searches last-to-first. The last '2' in the array corresponds to 'E'.", 
+    topic: "XLOOKUP" 
+  },
+  { 
+    q: "In =NETWORKDAYS.INTL(Start, End, 11), what does 11 represent?", 
+    opts: [
+      "Sunday is the only weekend day", 
+      "Saturday is the only weekend day", 
+      "Monday is the only weekend day", 
+      "Both Saturday and Sunday are weekends"
+    ], 
+    ans: 0, 
+    exp: "Predefined code 11 indicates a Sunday-only weekend.", 
+    topic: "NETWORKDAYS" 
+  },
+  { 
+    q: "Which formula converts a column of dates into the last day of their respective years?", 
+    opts: [
+      "=DATE(YEAR(A1:A10), 12, 31)", 
+      "=EOMONTH(A1:A10, 12)", 
+      "=YEAR(A1:A10) & \"-12-31\"", 
+      "=EDATE(A1:A10, 12)"
+    ], 
+    ans: 0, 
+    exp: "DATE(YEAR, 12, 31) reconstructs the exact last day of the year for any given date.", 
+    topic: "EOMONTH" 
+  },
+  { 
+    q: "How do you count items in Col A that are NOT in Col B?", 
+    opts: [
+      "=SUMPRODUCT(--(ISNA(MATCH(A1:A10, B1:B10, 0))))", 
+      "=COUNTIF(A1:A10, \"<>\"&B1:B10)", 
+      "=FILTER(A1:A10, B1:B10=\"\")", 
+      "=SUMPRODUCT(A1:A10<>B1:B10)"
+    ], 
+    ans: 0, 
+    exp: "MATCH returns #N/A for missing items; ISNA converts to TRUE; SUMPRODUCT counts them.", 
+    topic: "INDEX + MATCH" 
+  },
+  { 
+    q: "In =IFERROR(VLOOKUP(...), \"Check ID\"), when does 'Check ID' appear?", 
+    opts: [
+      "When any error occurs (#N/A, #REF!, etc.)", 
+      "Only when the ID is not found (#N/A)", 
+      "When the cell is blank", 
+      "When the lookup range is incorrect"
+    ], 
+    ans: 0, 
+    exp: "IFERROR catches all standard Excel errors, not just #N/A.", 
+    topic: "Error Handling" 
+  },
+  { 
+    q: "What is the spill behavior of =TEXTSPLIT(\"1;2|3;4\", \";\", \"|\")?", 
+    opts: [
+      "A 2x2 grid (A1:B2)", 
+      "A 4x1 vertical column", 
+      "A 1x4 horizontal row", 
+      "A #VALUE! error"
+    ], 
+    ans: 0, 
+    exp: "Using ';' as col_delim and '|' as row_delim creates a multi-dimensional grid.", 
+    topic: "TEXTSPLIT" 
+  },
+  { 
+    q: "What is the result of =LEN(TEXTJOIN(\" \", TRUE, \" \", \" \"))?", 
+    opts: [
+      "0", 
+      "1", 
+      "2", 
+      "3"
+    ], 
+    ans: 0, 
+    exp: "The strings provided are spaces. With ignore_empty=TRUE, TEXTJOIN treats spaces as non-empty but the resulting string may still be empty if only empty-strings are joined. Actually, ' ' is not an empty string. Result is 1 (one space) because it joins two spaces with a space and ignores nothing.", 
+    topic: "TEXTJOIN" 
+  },
+  { 
+    q: "Result of =IF(A1, \"True\", \"False\") if A1 contains the number 0?", 
+    opts: [
+      "False", 
+      "True", 
+      "#VALUE!", 
+      "0"
+    ], 
+    ans: 0, 
+    exp: "In Excel, 0 is logically FALSE. Any other number is logically TRUE.", 
+    topic: "Nested IF" 
+  },
+  { 
+    q: "In Pivot Tables, what happens if you 'Group' a date field by Months?", 
+    opts: [
+      "It creates virtual fields for Months/Years", 
+      "It deletes the daily data", 
+      "It changes the source data formatting", 
+      "It requires a VLOOKUP"
+    ], 
+    ans: 0, 
+    exp: "Grouping dates creates extra levels in the field list without changing the original data source.", 
+    topic: "Pivot Table" 
+  },
+  { 
+    q: "To find the average of only the positive numbers in A1:A10, use:", 
+    opts: [
+      "=AVERAGEIF(A1:A10, \">0\")", 
+      "=SUMIF(A1:A10, \">0\") / 10", 
+      "=AVERAGE(IF(A1:A10>0, A1:A10))", 
+      "Both 1 and 3 are correct"
+    ], 
+    ans: 3, 
+    exp: "AVERAGEIF is the built-in way; the array formula (IF) also works in Excel 365.", 
+    topic: "SUMIFS" 
+  }
+];
+
+// ===================== GAME STATE =====================
+let currentQ = 0, score = 0, correct = 0, answered = false;
+let userAnswers = [];
+let timeLeft = 30 * 60;
+let timerInterval;
+let startTime = Date.now();
+const TOTAL = 25;
+let playerHP = 500, enemyHP = 500;
+const playerMaxHP = 500, enemyMaxHP = 500;
+const playerDamagePerWrong = 40;
+const enemyDamagePerCorrect = 40;
+
+const userData = JSON.parse(sessionStorage.getItem('userData') || '{"name":"Player","dept":""}');
+document.getElementById('player-name-hud').textContent = userData.name.split(' ')[0].toUpperCase();
+
+function renderQuestion() {
+  const q = highQuestions[currentQ];
+  document.getElementById('hud-qnum').textContent = `${currentQ+1}/25`;
+  document.getElementById('q-num-display').textContent = `Q${currentQ+1} of 25`;
+  document.getElementById('q-topic').textContent = q.topic;
+  document.getElementById('q-text').textContent = q.q;
+  document.getElementById('q-progress').style.width = `${Math.max(4,(currentQ/TOTAL)*100)}%`;
+  const container = document.getElementById('options-container');
+  container.innerHTML = '';
+  ['A','B','C','D'].forEach((lbl, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'opt-btn';
+    btn.innerHTML = `<span class="opt-label">${lbl}</span>${q.opts[i]}`;
+    btn.onclick = () => selectAnswer(i, btn);
+    container.appendChild(btn);
+  });
+  document.getElementById('explanation-box').style.display = 'none';
+  document.getElementById('next-btn').style.display = 'none';
+  answered = false;
+  playerAttacking = false; enemyShaking = false; playerDamage = false;
+  const card = document.getElementById('q-card');
+  card.style.opacity = '0'; card.style.transform = 'scale(0.96)';
+  setTimeout(() => { card.style.transition = 'all 0.35s ease'; card.style.opacity = '1'; card.style.transform = 'scale(1)'; }, 50);
+}
+
+function selectAnswer(idx, clickedBtn) {
+  if (answered) return;
+  answered = true;
+  const q = highQuestions[currentQ];
+  const allBtns = document.querySelectorAll('.opt-btn');
+  allBtns.forEach(b => b.classList.add('disabled'));
+  const isCorrect = idx === q.ans;
+  userAnswers.push({ qIdx: currentQ, userAns: idx, correct: isCorrect });
+
+  if (isCorrect) {
+    clickedBtn.classList.add('correct');
+    score += 5; correct++;
+    document.getElementById('hud-score').textContent = score;
+    document.getElementById('hud-correct').textContent = correct;
+    // Attack enemy
+    enemyHP = Math.max(0, enemyHP - enemyDamagePerCorrect);
+    updateHealthBars();
+    playerAttacking = true;
+    enemyShaking = true;
+    setTimeout(() => { playerAttacking = false; enemyShaking = false; }, 600);
+    createParticleBurst(battleCanvas.width*0.78, battleCanvas.height*0.62, '#ff3c60');
+    showCombatText('⚔️ HIT! +5', '#00ff88');
+    flash('rgba(0,255,136,0.1)');
+  } else {
+    clickedBtn.classList.add('wrong');
+    allBtns[q.ans].classList.add('correct');
+    playerHP = Math.max(0, playerHP - playerDamagePerWrong);
+    updateHealthBars();
+    playerDamage = true;
+    setTimeout(() => { playerDamage = false; }, 600);
+    createParticleBurst(battleCanvas.width*0.2, battleCanvas.height*0.62, '#ff3c60');
+    showCombatText('💥 BLOCKED!', '#ff3c60');
+    flash('rgba(255,60,96,0.1)');
+    document.getElementById('q-card').classList.add('shake');
+    setTimeout(() => document.getElementById('q-card').classList.remove('shake'), 400);
+  }
+  document.getElementById('explanation-text').textContent = q.exp;
+  document.getElementById('explanation-box').style.display = 'block';
+  document.getElementById('next-btn').style.display = 'block';
+}
+
+function updateHealthBars() {
+  const pPct = (playerHP / playerMaxHP) * 100;
+  const ePct = (enemyHP / enemyMaxHP) * 100;
+  document.getElementById('player-health').style.width = pPct + '%';
+  document.getElementById('enemy-health').style.width = ePct + '%';
+  document.getElementById('player-hp').textContent = playerHP;
+  document.getElementById('enemy-hp').textContent = enemyHP;
+}
+
+function createParticleBurst(x, y, color) {
+  for (let i = 0; i < 15; i++) {
+    const angle = (Math.PI * 2 / 15) * i;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * (Math.random() * 5 + 2),
+      vy: Math.sin(angle) * (Math.random() * 5 + 2) - 3,
+      r: Math.random() * 4 + 2,
+      color, life: 30, maxLife: 30
+    });
+  }
+}
+
+function showCombatText(text, color) {
+  const popup = document.getElementById('combat-popup');
+  popup.textContent = text;
+  popup.style.color = color;
+  popup.style.textShadow = `0 0 20px ${color}`;
+  popup.classList.add('show');
+  setTimeout(() => { popup.classList.remove('show'); popup.classList.add('hide'); setTimeout(() => popup.classList.remove('hide'), 300); }, 900);
+}
+
+function flash(color) {
+  const el = document.getElementById('flash');
+  el.style.background = color;
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 300);
+}
+
+function nextQuestion() {
+  if (currentQ < TOTAL - 1) {
+    currentQ++;
+    renderQuestion();
+  } else {
+    endGame();
+  }
+}
+
+// ===================== TIMER =====================
+function startTimer() {
+  updateTimerDisplay();
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimerDisplay();
+    if (timeLeft <= 0) { clearInterval(timerInterval); endGame(); }
+  }, 1000);
+}
+function updateTimerDisplay() {
+  const m = Math.floor(timeLeft / 60);
+  const s = timeLeft % 60;
+  document.getElementById('timer-display').textContent = `${m}:${s.toString().padStart(2,'0')}`;
+  const pct = timeLeft / (30*60);
+  const circ = 138.2;
+  document.getElementById('timer-ring-fill').style.strokeDashoffset = circ * (1-pct);
+  const ring = document.getElementById('timer-ring-fill');
+  ring.style.stroke = pct < 0.2 ? '#ff3c60' : pct < 0.5 ? '#ffaa00' : '#b44fff';
+}
+
+// ===================== END GAME =====================
+const SHEETS_URL = 'https://defaultf085025b86d343c3860c4a537cc98b.fc.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/dea35cd3e8ae43ab86b81671a1465890/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=zXPQzOtaW930NNZZVU365qhDz57c8imRXBSzyDav__g';
+
+function endGame() {
+  clearInterval(timerInterval);   // ✅ correct variable
+
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+
+  const res = {
+    name: userData.name,
+    empId: userData.empId || '',
+    dept: userData.dept || '',
+    mode: 'High-Level',
+    score,
+    correct,
+    accuracy: Math.round(correct / 25 * 100),
+    timeTaken: `${Math.floor(elapsed/60)}m ${elapsed%60}s`,
+    rank: score >= 100 ? 'Expert' : score >= 60 ? 'Intermediate' : 'Beginner',
+    timestamp: new Date().toISOString()
+  };
+
+  fetch(SHEETS_URL, {
+   method: 'POST',
+   headers: {
+    'Content-Type': 'application/json'
+   },
+   body: JSON.stringify(res)
+  })
+  .then(response => response.json())
+  .then(data => console.log('Success:', data))
+  .catch(error => console.error('Error:', error));
+
+  sessionStorage.setItem('gameResult', JSON.stringify({
+    ...res,
+    userAnswers,
+    questions: highQuestions   // ✅ FIXED
+  }));
+
+  const all = JSON.parse(localStorage.getItem('assessmentResults') || '[]');
+  all.push(res);
+  localStorage.setItem('assessmentResults', JSON.stringify(all));
+
+  setTimeout(() => {
+  window.location.href = 'result.html';
+}, 500);
+
+}
+renderQuestion();
+startTimer();
+</script>
+</body>
+</html>

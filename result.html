@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Results | EMSME & ASBS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --neon-green:#00ff88; --neon-blue:#00d4ff; --neon-purple:#b44fff; --dark-bg:#050a14; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Rajdhani',sans-serif; background:var(--dark-bg); min-height:100vh; color:#e0f0ff; overflow-x:hidden; }
+  .orbitron { font-family:'Orbitron',sans-serif; }
+
+  /* Confetti canvas */
+  #confetti-canvas { position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+
+  /* Star canvas */
+  #star-canvas { position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+
+  .content-wrap { position:relative; z-index:10; max-width:900px; margin:0 auto; padding:24px 16px 60px; }
+
+  /* Score card */
+  .score-card {
+    background:rgba(0,15,30,0.95);
+    border:1px solid rgba(0,212,255,0.3);
+    border-radius:20px;
+    padding:40px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+    backdrop-filter:blur(20px);
+    margin-bottom:24px;
+  }
+  .score-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:4px;
+    background:linear-gradient(90deg,#b44fff,#00d4ff,#00ff88,#00d4ff,#b44fff);
+    background-size:200% 100%;
+    animation:gradientShift 3s linear infinite;
+  }
+  @keyframes gradientShift { 0%{background-position:0% 0%} 100%{background-position:200% 0%} }
+
+  .score-ring { position:relative; display:inline-flex; align-items:center; justify-content:center; margin:20px 0; }
+  .score-ring svg { filter:drop-shadow(0 0 12px rgba(0,255,136,0.5)); }
+  .score-ring-text { position:absolute; text-align:center; }
+
+  /* Stat box */
+  .stat-box { background:rgba(0,212,255,0.05); border:1px solid rgba(0,212,255,0.2); border-radius:12px; padding:20px; text-align:center; }
+  .stat-val { font-family:'Orbitron',sans-serif; font-size:28px; font-weight:900; }
+  .stat-label { font-size:12px; text-transform:uppercase; letter-spacing:1px; color:rgba(0,212,255,0.6); margin-top:4px; }
+
+  /* Rank badge */
+  .rank-badge { display:inline-block; padding:8px 24px; border-radius:30px; font-family:'Orbitron',sans-serif; font-size:18px; font-weight:700; letter-spacing:2px; margin-top:16px; animation:rankPulse 2s ease-in-out infinite; }
+  .rank-expert { background:rgba(0,255,136,0.15); border:2px solid #00ff88; color:#00ff88; }
+  .rank-intermediate { background:rgba(0,212,255,0.15); border:2px solid #00d4ff; color:#00d4ff; }
+  .rank-beginner { background:rgba(180,79,255,0.15); border:2px solid #b44fff; color:#b44fff; }
+  @keyframes rankPulse { 0%,100%{box-shadow:0 0 15px currentColor} 50%{box-shadow:0 0 35px currentColor} }
+
+  /* Review section */
+  .review-card {
+    background:rgba(0,10,20,0.9);
+    border:1px solid rgba(0,212,255,0.15);
+    border-radius:14px;
+    padding:20px;
+    margin-bottom:12px;
+    transition:all 0.3s;
+    backdrop-filter:blur(10px);
+  }
+  .review-card.correct-card { border-color:rgba(0,255,136,0.3); }
+  .review-card.wrong-card { border-color:rgba(255,60,60,0.3); }
+  .review-card:hover { transform:translateX(4px); }
+
+  .q-header { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+  .q-num-badge { font-family:'Orbitron',sans-serif; font-size:11px; font-weight:700; padding:3px 12px; border-radius:20px; flex-shrink:0; }
+  .badge-correct { background:rgba(0,255,136,0.15); border:1px solid rgba(0,255,136,0.4); color:#00ff88; }
+  .badge-wrong { background:rgba(255,60,60,0.15); border:1px solid rgba(255,60,60,0.4); color:#ff3c3c; }
+
+  .answer-row { display:flex; align-items:flex-start; gap:8px; padding:8px 12px; border-radius:8px; font-size:14px; }
+  .answer-row.user-correct { background:rgba(0,255,136,0.1); }
+  .answer-row.user-wrong { background:rgba(255,60,60,0.1); }
+  .answer-row.correct-ans { background:rgba(0,255,136,0.07); border:1px solid rgba(0,255,136,0.2); }
+
+  .exp-box { background:rgba(0,212,255,0.05); border:1px solid rgba(0,212,255,0.15); border-radius:8px; padding:10px 14px; margin-top:10px; font-size:13px; color:rgba(224,240,255,0.75); }
+
+  /* Button */
+  .btn-primary { background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,255,136,0.05)); border:2px solid #00ff88; color:#00ff88; font-family:'Orbitron',sans-serif; font-weight:700; border-radius:8px; padding:12px 24px; cursor:pointer; transition:all 0.3s; letter-spacing:2px; font-size:13px; }
+  .btn-primary:hover { box-shadow:0 0 25px rgba(0,255,136,0.5); transform:translateY(-2px); }
+  .btn-secondary { background:linear-gradient(135deg,rgba(0,212,255,0.1),rgba(0,212,255,0.02)); border:2px solid rgba(0,212,255,0.5); color:#00d4ff; font-family:'Orbitron',sans-serif; font-weight:700; border-radius:8px; padding:12px 24px; cursor:pointer; transition:all 0.3s; letter-spacing:2px; font-size:13px; }
+  .btn-secondary:hover { box-shadow:0 0 25px rgba(0,212,255,0.4); transform:translateY(-2px); }
+
+  /* Filter tabs */
+  .filter-tab { padding:8px 20px; border-radius:20px; font-family:'Orbitron',sans-serif; font-size:11px; font-weight:700; cursor:pointer; border:1px solid; transition:all 0.3s; letter-spacing:1px; }
+  .filter-tab.active-all { background:rgba(0,212,255,0.2); border-color:#00d4ff; color:#00d4ff; }
+  .filter-tab.active-correct { background:rgba(0,255,136,0.2); border-color:#00ff88; color:#00ff88; }
+  .filter-tab.active-wrong { background:rgba(255,60,60,0.2); border-color:#ff3c3c; color:#ff3c3c; }
+  .filter-tab:not([class*="active"]) { border-color:rgba(255,255,255,0.15); color:rgba(255,255,255,0.4); background:transparent; }
+
+  .fade-in { animation:fadeInUp 0.6s ease forwards; opacity:0; }
+  @keyframes fadeInUp { to{opacity:1;transform:translateY(0)} from{opacity:0;transform:translateY(20px)} }
+
+  /* Grid lines */
+  .grid-overlay { position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; background-image:linear-gradient(rgba(0,212,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.02) 1px,transparent 1px); background-size:50px 50px; pointer-events:none; }
+</style>
+</head>
+<body>
+<canvas id="star-canvas"></canvas>
+<canvas id="confetti-canvas"></canvas>
+<div class="grid-overlay"></div>
+
+<div class="content-wrap">
+  <!-- Result Header -->
+  <div class="score-card fade-in">
+    <div class="orbitron text-xs tracking-widest mb-2" style="color:rgba(0,212,255,0.5)">ASSESSMENT COMPLETE</div>
+    <h1 class="orbitron text-2xl md:text-3xl font-black mb-2" style="color:#00d4ff" id="result-title">MISSION ACCOMPLISHED!</h1>
+    <div class="text-sm" style="color:rgba(224,240,255,0.6)" id="result-player">Loading...</div>
+
+    <!-- Score ring -->
+    <div class="score-ring">
+      <svg width="160" height="160" viewBox="0 0 160 160">
+        <circle cx="80" cy="80" r="68" fill="none" stroke="rgba(0,212,255,0.1)" stroke-width="10"/>
+        <circle id="score-ring-bg" cx="80" cy="80" r="68" fill="none" stroke="#00ff88" stroke-width="10"
+          stroke-dasharray="427.3" stroke-dashoffset="427.3" stroke-linecap="round"
+          style="transform:rotate(-90deg);transform-origin:center;transition:stroke-dashoffset 1.5s ease;"/>
+      </svg>
+      <div class="score-ring-text">
+        <div class="orbitron font-black" style="font-size:36px;color:#00ff88" id="final-score">0</div>
+        <div class="text-xs" style="color:rgba(0,212,255,0.6)">/ 125</div>
+      </div>
+    </div>
+
+    <div id="rank-display" class="rank-badge rank-beginner mb-6">LOADING...</div>
+
+    <!-- Stats grid -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+      <div class="stat-box">
+        <div class="stat-val" style="color:#00ff88" id="stat-correct">0</div>
+        <div class="stat-label">✅ Correct</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" style="color:#ff3c3c" id="stat-wrong">0</div>
+        <div class="stat-label">❌ Wrong</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" style="color:#00d4ff" id="stat-accuracy">0%</div>
+        <div class="stat-label">🎯 Accuracy</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" style="color:#b44fff" id="stat-time">0m 0s</div>
+        <div class="stat-label">⏱ Time</div>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="flex flex-wrap gap-3 justify-center mt-6">
+      <button class="btn-primary" onclick="window.location.href='index.html'">🔄 PLAY AGAIN</button>
+      <button class="btn-secondary" onclick="exportPDF()">📥 EXPORT RESULTS</button>
+    </div>
+  </div>
+
+  <!-- Review Section -->
+  <div class="fade-in" style="animation-delay:0.3s">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <h2 class="orbitron text-lg font-bold" style="color:#00d4ff">📋 ANSWER REVIEW</h2>
+      <div class="flex gap-2 flex-wrap">
+        <button class="filter-tab active-all" onclick="filterReview('all',this)" id="tab-all">ALL</button>
+        <button class="filter-tab" onclick="filterReview('correct',this)" id="tab-correct">✅ CORRECT</button>
+        <button class="filter-tab" onclick="filterReview('wrong',this)" id="tab-wrong">❌ WRONG</button>
+      </div>
+    </div>
+    <div id="review-container"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ===================== STARS =====================
+const starCanvas = document.getElementById('star-canvas');
+const sctx = starCanvas.getContext('2d');
+let stars = [];
+function resizeStar() { starCanvas.width = window.innerWidth; starCanvas.height = window.innerHeight; }
+function initStars() {
+  stars = [];
+  for (let i = 0; i < 120; i++) stars.push({ x:Math.random()*starCanvas.width, y:Math.random()*starCanvas.height, r:Math.random()*1.5+0.3, b:Math.random(), bd:Math.random()>0.5?1:-1, s:Math.random()*0.15+0.03 });
+}
+function animStars() {
+  sctx.clearRect(0,0,starCanvas.width,starCanvas.height);
+  stars.forEach(s => {
+    s.b += 0.005*s.bd;
+    if(s.b>=1||s.b<=0.2) s.bd*=-1;
+    sctx.beginPath(); sctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    sctx.fillStyle=`rgba(180,220,255,${s.b*0.8})`; sctx.fill();
+  });
+  requestAnimationFrame(animStars);
+}
+window.addEventListener('resize', () => { resizeStar(); initStars(); });
+resizeStar(); initStars(); animStars();
+
+// ===================== CONFETTI =====================
+const confCanvas = document.getElementById('confetti-canvas');
+const cctx = confCanvas.getContext('2d');
+confCanvas.width = window.innerWidth; confCanvas.height = window.innerHeight;
+let confettiPieces = [];
+let confettiActive = false;
+const confColors = ['#00ff88','#00d4ff','#b44fff','#ffaa00','#ff3c60','#ffffff'];
+
+function launchConfetti() {
+  confettiActive = true;
+  for (let i = 0; i < 200; i++) {
+    confettiPieces.push({
+      x: Math.random() * confCanvas.width, y: -10,
+      vx: (Math.random()-0.5)*6, vy: Math.random()*4+2,
+      rotation: Math.random()*360, rotSpeed: (Math.random()-0.5)*8,
+      w: Math.random()*12+6, h: Math.random()*6+3,
+      color: confColors[Math.floor(Math.random()*confColors.length)],
+      life: 1, gravity: 0.08
+    });
+  }
+  animConfetti();
+}
+function animConfetti() {
+  cctx.clearRect(0,0,confCanvas.width,confCanvas.height);
+  confettiPieces = confettiPieces.filter(p => p.y < confCanvas.height + 20 && p.life > 0);
+  confettiPieces.forEach(p => {
+    cctx.save();
+    cctx.translate(p.x, p.y);
+    cctx.rotate(p.rotation * Math.PI/180);
+    cctx.globalAlpha = Math.min(1, p.life);
+    cctx.fillStyle = p.color;
+    cctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+    cctx.restore();
+    p.x += p.vx; p.y += p.vy; p.vy += p.gravity;
+    p.rotation += p.rotSpeed;
+    if (p.y > confCanvas.height * 0.7) p.life -= 0.02;
+  });
+  if (confettiPieces.length > 0) requestAnimationFrame(animConfetti);
+}
+
+// ===================== LOAD RESULTS =====================
+let resultData = null;
+let reviewCards = [];
+
+window.onload = () => {
+  const raw = sessionStorage.getItem('gameResult');
+  if (!raw) { document.body.innerHTML = '<div style="text-align:center;padding:100px;font-family:Orbitron,sans-serif;color:#00d4ff">No result data found. <a href="index.html" style="color:#00ff88">← Go Home</a></div>'; return; }
+  resultData = JSON.parse(raw);
+
+  // Populate header
+  document.getElementById('result-player').textContent = `${resultData.name} · ${resultData.dept} · ${resultData.mode.toUpperCase()} GAME`;
+  document.getElementById('stat-correct').textContent = resultData.correct;
+  document.getElementById('stat-wrong').textContent = 25 - resultData.correct;
+  document.getElementById('stat-accuracy').textContent = resultData.accuracy + '%';
+  document.getElementById('stat-time').textContent = resultData.timeTaken;
+
+  const rank = resultData.rank;
+  const rankEl = document.getElementById('rank-display');
+  rankEl.textContent = '🏅 ' + rank.toUpperCase();
+  rankEl.className = `rank-badge rank-${rank.toLowerCase()}`;
+
+  if (resultData.score >= 100) {
+    document.getElementById('result-title').textContent = '🏆 EXCEL MASTER!';
+    setTimeout(launchConfetti, 800);
+  } else if (resultData.score >= 60) {
+    document.getElementById('result-title').textContent = '⚡ GREAT PERFORMANCE!';
+    setTimeout(launchConfetti, 800);
+  } else {
+    document.getElementById('result-title').textContent = '💪 KEEP PRACTICING!';
+  }
+
+  // Animate score ring
+  setTimeout(() => {
+    document.getElementById('final-score').textContent = resultData.score;
+    const pct = resultData.score / 125;
+    const circ = 427.3;
+    document.getElementById('score-ring-bg').style.strokeDashoffset = circ * (1 - pct);
+    if (pct < 0.5) document.getElementById('score-ring-bg').style.stroke = '#b44fff';
+    else if (pct < 0.8) document.getElementById('score-ring-bg').style.stroke = '#00d4ff';
+    else document.getElementById('score-ring-bg').style.stroke = '#00ff88';
+  }, 300);
+
+  buildReview();
+};
+
+function buildReview() {
+  const container = document.getElementById('review-container');
+  container.innerHTML = '';
+  reviewCards = [];
+  resultData.userAnswers.forEach((ua, i) => {
+    const q = resultData.questions[ua.qIdx];
+    const isCorrect = ua.correct;
+    const card = document.createElement('div');
+    card.className = `review-card ${isCorrect ? 'correct-card' : 'wrong-card'} fade-in`;
+    card.style.animationDelay = `${0.05*i}s`;
+    card.dataset.type = isCorrect ? 'correct' : 'wrong';
+
+    const userAnsText = ua.userAns >= 0 ? q.opts[ua.userAns] : 'Not answered';
+    const correctAnsText = q.opts[q.ans];
+
+    card.innerHTML = `
+      <div class="q-header">
+        <div class="q-num-badge ${isCorrect ? 'badge-correct' : 'badge-wrong'}">${isCorrect ? '✅' : '❌'} Q${i+1}</div>
+        <p class="font-semibold flex-1" style="color:#e0f0ff;font-size:15px">${q.q}</p>
+      </div>
+      ${isCorrect ? `
+        <div class="answer-row user-correct">
+          <span style="color:#00ff88;font-size:16px">✅</span>
+          <div><span style="color:rgba(0,255,136,0.7);font-size:12px;font-family:'Orbitron',sans-serif">YOUR ANSWER (CORRECT)</span><br>${userAnsText}</div>
+        </div>
+      ` : `
+        <div class="answer-row user-wrong">
+          <span style="color:#ff3c3c;font-size:16px">❌</span>
+          <div><span style="color:rgba(255,60,60,0.7);font-size:12px;font-family:'Orbitron',sans-serif">YOUR ANSWER</span><br>${userAnsText}</div>
+        </div>
+        <div class="answer-row correct-ans mt-2">
+          <span style="color:#00ff88;font-size:16px">✅</span>
+          <div><span style="color:rgba(0,255,136,0.7);font-size:12px;font-family:'Orbitron',sans-serif">CORRECT ANSWER</span><br>${correctAnsText}</div>
+        </div>
+      `}
+      <div class="exp-box mt-3">
+        <span style="color:#00d4ff;font-family:'Orbitron',sans-serif;font-size:11px">📖 EXPLANATION: </span>${q.exp}
+      </div>
+    `;
+    container.appendChild(card);
+    reviewCards.push(card);
+  });
+}
+
+function filterReview(type, tabEl) {
+  // Update tabs
+  document.querySelectorAll('.filter-tab').forEach(t => {
+    t.className = 'filter-tab';
+  });
+  tabEl.classList.add(`active-${type}`);
+
+  reviewCards.forEach(card => {
+    if (type === 'all') card.style.display = 'block';
+    else card.style.display = card.dataset.type === type ? 'block' : 'none';
+  });
+}
+
+function exportPDF() {
+  if (!resultData) return;
+  // Export as Excel using SheetJS
+  const wb = XLSX.utils.book_new();
+  // Summary sheet
+  const summaryData = [
+    ['EMSME & ASBS Assessment — Result Report'],
+    [],
+    ['Employee Name', resultData.name],
+    ['Employee ID', resultData.empId],
+    ['Department', resultData.dept],
+    ['Game Mode', resultData.mode],
+    ['Date & Time', new Date(resultData.timestamp).toLocaleString()],
+    [],
+    ['SCORE SUMMARY'],
+    ['Total Score', resultData.score + ' / 125'],
+    ['Correct Answers', resultData.correct + ' / 25'],
+    ['Wrong Answers', (25-resultData.correct) + ' / 25'],
+    ['Accuracy', resultData.accuracy + '%'],
+    ['Time Taken', resultData.timeTaken],
+    ['Rank', resultData.rank],
+  ];
+  const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+  ws1['!cols'] = [{wch:22},{wch:40}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+
+  // Review sheet
+  const reviewHeader = ['#','Question','Your Answer','Correct Answer','Result','Explanation'];
+  const reviewRows = resultData.userAnswers.map((ua,i) => {
+    const q = resultData.questions[ua.qIdx];
+    return [
+      i+1, q.q,
+      ua.userAns >= 0 ? q.opts[ua.userAns] : 'Not Answered',
+      q.opts[q.ans],
+      ua.correct ? 'CORRECT ✅' : 'WRONG ❌',
+      q.exp
+    ];
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet([reviewHeader, ...reviewRows]);
+  ws2['!cols'] = [{wch:4},{wch:50},{wch:30},{wch:30},{wch:12},{wch:60}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Answer Review');
+
+  XLSX.writeFile(wb, `${resultData.name.replace(/ /g,'_')}_${resultData.mode}_Result.xlsx`);
+}
+</script>
+</body>
+</html>
