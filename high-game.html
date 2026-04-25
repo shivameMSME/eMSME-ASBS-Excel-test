@@ -399,16 +399,17 @@ const highQuestions = [
     topic: "INDEX + MATCH" 
   },
   { 
-    q: "If A1:A10 contains numbers, what is the result of =SUMPRODUCT(1/COUNTIF(A1:A10, A1:A10))?", 
+{ 
+    q: "To find the LAST occurrence of 'Item A' in a column using XLOOKUP, which argument must be modified?", 
     opts: [
-      "The count of unique values in the range", 
-      "The sum of all numbers in the range", 
-      "The average of all values in the range", 
-      "A #DIV/0! error if the range is sorted"
+      "Search Mode (set to -1)", 
+      "Match Mode (set to 2)", 
+      "If Not Found (set to 0)", 
+      "Search Mode (set to 1)"
     ], 
     ans: 0, 
-    exp: "This is a classic 'Unique Count' formula. It sums the fractional occurrence of each value (e.g., three '5's each count as 1/3, totaling 1).", 
-    topic: "SUMPRODUCT" 
+    exp: "Search Mode 1 is first-to-last (default), while -1 is last-to-first.", 
+    topic: "XLOOKUP" 
   },
   { 
     q: "How do you FILTER Table1 to show rows where the Name (Col A) contains the letter 'z' (case-insensitive)?", 
@@ -495,16 +496,16 @@ const highQuestions = [
     topic: "Error Handling" 
   },
   { 
-    q: "How does =SUMPRODUCT(--(A1:A10=\"Yes\")) differ from =SUMPRODUCT(A1:A10=\"Yes\")?", 
+    q: "How can you count items in Col A that are NOT present in Col B?", 
     opts: [
-      "The second one returns 0 because it doesn't convert Booleans", 
-      "There is no difference in Excel 365", 
-      "The first one is slower but more accurate", 
-      "The second one sums the lengths of the strings"
+      "=SUMPRODUCT(--(ISNA(MATCH(A1:A10, B1:B10, 0))))", 
+      "=COUNTIF(A1:A10, \"<>\"&B1:B10)", 
+      "=FILTER(A1:A10, B1:B10=\"\")", 
+      "=SUMPRODUCT(A1:A10<>B1:B10)"
     ], 
     ans: 0, 
-    exp: "SUMPRODUCT ignores non-numeric values. TRUE/FALSE are booleans. '--' coerces them into 1s and 0s.", 
-    topic: "SUMPRODUCT" 
+    exp: "MATCH returns #N/A for missing items; ISNA converts these to TRUE; -- converts TRUE to 1, and SUMPRODUCT sums them.", 
+    topic: "INDEX + MATCH" 
   },
   { 
     q: "What is the result of =INDEX(A1:C10, 0, 2)?", 
