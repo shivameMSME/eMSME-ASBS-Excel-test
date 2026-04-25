@@ -328,6 +328,14 @@ resizeRoad();
 function gameLoop() { drawRoad(); requestAnimationFrame(gameLoop); }
 gameLoop();
 
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 // ===================== QUESTIONS =====================
 // Add these new harder questions to the midQuestions array in mid-game.html
 const midQuestions = [
@@ -508,6 +516,8 @@ const midQuestions = [
   }
 ];
 
+let questions = shuffleArray([...midQuestions]);
+
 // ===================== GAME STATE =====================
 let currentQ = 0, score = 0, correct = 0, answered = false;
 let userAnswers = [];
@@ -520,7 +530,7 @@ const userData = JSON.parse(sessionStorage.getItem('userData') || '{"name":"Play
 document.getElementById('hud-user').textContent = userData.name + ' · ' + userData.dept;
 
 function renderQuestion() {
-  const q = midQuestions[currentQ];
+  const q = questions[currentQ];
   document.getElementById('hud-qnum').textContent = `${currentQ+1} / 25`;
   document.getElementById('q-num-display').textContent = `Q${currentQ+1} of 25`;
   document.getElementById('q-topic').textContent = q.topic;
@@ -528,13 +538,23 @@ function renderQuestion() {
   document.getElementById('road-progress').style.width = `${Math.max(4,(currentQ/TOTAL)*100)}%`;
   const container = document.getElementById('options-container');
   container.innerHTML = '';
-  ['A','B','C','D'].forEach((lbl, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'opt-btn';
-    btn.innerHTML = `<span class="opt-label">${lbl}</span>${q.opts[i]}`;
-    btn.onclick = () => selectAnswer(i, btn);
-    container.appendChild(btn);
-  });
+let options = q.opts.map((opt, index) => ({
+  text: opt,
+  isCorrect: index === q.ans
+}));
+ 
+options = shuffleArray(options);
+ 
+options.forEach((opt, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'opt-btn';
+ 
+  btn.innerHTML = `<span class="opt-label">${String.fromCharCode(65+i)}</span> ${opt.text}`;
+ 
+  btn.onclick = () => selectAnswer(opt.isCorrect, btn, q);
+ 
+  container.appendChild(btn);
+});
   document.getElementById('explanation-box').style.display = 'none';
   document.getElementById('next-btn').style.display = 'none';
   answered = false;
@@ -544,32 +564,50 @@ function renderQuestion() {
   setTimeout(() => { card.style.transition = 'all 0.4s ease'; card.style.opacity = '1'; card.style.transform = 'translateX(0)'; }, 50);
 }
 
-function selectAnswer(idx, clickedBtn) {
+function selectAnswer(isCorrect, clickedBtn, q) {
   if (answered) return;
   answered = true;
-  const q = midQuestions[currentQ];
+ 
   const allBtns = document.querySelectorAll('.opt-btn');
   allBtns.forEach(b => b.classList.add('disabled'));
-  const isCorrect = idx === q.ans;
-  userAnswers.push({ qIdx: currentQ, userAns: idx, correct: isCorrect });
+ 
+  userAnswers.push({
+    qIdx: currentQ,
+    correct: isCorrect
+  });
+ 
   if (isCorrect) {
     clickedBtn.classList.add('correct');
-    score += 5; correct++;
+    score += 5;
+    correct++;
+ 
     document.getElementById('hud-score').textContent = score;
     document.getElementById('hud-correct').textContent = correct;
+ 
     roadSpeed = Math.min(8, roadSpeed + 1);
     updateSpeed(Math.min(100, parseInt(document.getElementById('speed-val').textContent) + 15));
+ 
     showScorePopup('+5', '#00ff88');
     flash('green');
     showSpeedLines();
+ 
   } else {
     clickedBtn.classList.add('wrong');
-    allBtns[q.ans].classList.add('correct');
+ 
+    // highlight correct option
+    allBtns.forEach(b => {
+      if (b.innerText.includes(q.opts[q.ans])) {
+        b.classList.add('correct');
+      }
+    });
+ 
     roadSpeed = Math.max(1, roadSpeed - 1);
     updateSpeed(Math.max(10, parseInt(document.getElementById('speed-val').textContent) - 20));
+ 
     showScorePopup('SLOW!', '#ff3c3c');
     flash('red');
   }
+ 
   document.getElementById('explanation-text').textContent = q.exp;
   document.getElementById('explanation-box').style.display = 'block';
   document.getElementById('next-btn').style.display = 'block';
@@ -670,7 +708,7 @@ function endGame() {
   sessionStorage.setItem('gameResult', JSON.stringify({
     ...res,
     userAnswers,
-    questions: midQuestions   // ✅ correct
+    questions: questions   // ✅ correct
   }));
 
   const all = JSON.parse(localStorage.getItem('assessmentResults') || '[]');
