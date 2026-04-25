@@ -542,18 +542,7 @@ const highQuestions = [
     exp: "TEXTSPLIT(text, col_delim, row_delim, [ignore_empty]). Setting the 4th argument to TRUE removes gaps.", 
     topic: "TEXTSPLIT" 
   },
-  { 
-    q: "What happens if =IFS(A1>10, \"High\", A1>5, \"Mid\") is evaluated for A1 = 12?", 
-    opts: [
-      "Returns 'High'", 
-      "Returns 'High' and 'Mid' in two cells", 
-      "Returns an error", 
-      "Returns 'Mid'"
-    ], 
-    ans: 0, 
-    exp: "IFS stops at the first condition that is TRUE. Even though 12 is > 5, it stops at > 10.", 
-    topic: "Nested IF" 
-  },
+{ q: "How do you handle a #DIV/0! error to show 0 instead?", opts: ["=IFERROR(Formula, 0)", "=IFNA(Formula, 0)", "=IF(Formula=ERROR, 0)", "=FIX(Formula)"], ans: 0, exp: "IFERROR catches all error types and returns the specified value.", topic: "ERROR" },
   { 
     q: "Result of =XLOOKUP(2, {1,3,2,4,2}, {\"A\",\"B\",\"C\",\"D\",\"E\"}, , 0, -1)?", 
     opts: [
@@ -629,10 +618,10 @@ const highQuestions = [
   { 
     q: "What is the result of =LEN(TEXTJOIN(\" \", TRUE, \" \", \" \"))?", 
     opts: [
-      "0", 
+      "3", 
       "1", 
       "2", 
-      "3"
+      "0"
     ], 
     ans: 0, 
     exp: "The strings provided are spaces. With ignore_empty=TRUE, TEXTJOIN treats spaces as non-empty but the resulting string may still be empty if only empty-strings are joined. Actually, ' ' is not an empty string. Result is 1 (one space) because it joins two spaces with a space and ignores nothing.", 
@@ -662,18 +651,7 @@ const highQuestions = [
     exp: "Grouping dates creates extra levels in the field list without changing the original data source.", 
     topic: "Pivot Table" 
   },
-  { 
-    q: "To find the average of only the positive numbers in A1:A10, use:", 
-    opts: [
-      "=AVERAGEIF(A1:A10, \">0\")", 
-      "=SUMIF(A1:A10, \">0\") / 10", 
-      "=AVERAGE(IF(A1:A10>0, A1:A10))", 
-      "Both 1 and 3 are correct"
-    ], 
-    ans: 3, 
-    exp: "AVERAGEIF is the built-in way; the array formula (IF) also works in Excel 365.", 
-    topic: "SUMIFS" 
-  }
+{ q: "To count working days between two dates including Saturdays but excluding Sundays, which formula is used?", opts: ["=NETWORKDAYS()", "=NETWORKDAYS.INTL(start, end, 1)", "=NETWORKDAYS.INTL(start, end, 11)", "=WORKDAY.INTL(start, end, 11)"], ans: 2, exp: "Weekend string '11' or the number 11 in NETWORKDAYS.INTL specifies that only Sunday is a weekend.", topic: "NETWORKDAYS" }
 ];
 
 let questions = shuffleArray([...highQuestions]);
