@@ -364,6 +364,14 @@ window.addEventListener('resize', resizeBattle);
 resizeBattle();
 drawBattle();
 
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 // ===================== QUESTIONS =====================
 const highQuestions = [
   { 
@@ -668,6 +676,8 @@ const highQuestions = [
   }
 ];
 
+let questions = shuffleArray([...highQuestions]);
+
 // ===================== GAME STATE =====================
 let currentQ = 0, score = 0, correct = 0, answered = false;
 let userAnswers = [];
@@ -684,7 +694,7 @@ const userData = JSON.parse(sessionStorage.getItem('userData') || '{"name":"Play
 document.getElementById('player-name-hud').textContent = userData.name.split(' ')[0].toUpperCase();
 
 function renderQuestion() {
-  const q = highQuestions[currentQ];
+  const q = questions[currentQ];
   document.getElementById('hud-qnum').textContent = `${currentQ+1}/25`;
   document.getElementById('q-num-display').textContent = `Q${currentQ+1} of 25`;
   document.getElementById('q-topic').textContent = q.topic;
@@ -692,12 +702,22 @@ function renderQuestion() {
   document.getElementById('q-progress').style.width = `${Math.max(4,(currentQ/TOTAL)*100)}%`;
   const container = document.getElementById('options-container');
   container.innerHTML = '';
-  ['A','B','C','D'].forEach((lbl, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'opt-btn';
-    btn.innerHTML = `<span class="opt-label">${lbl}</span>${q.opts[i]}`;
-    btn.onclick = () => selectAnswer(i, btn);
-    container.appendChild(btn);
+  let options = q.opts.map((opt, index) => ({
+   text: opt,
+   isCorrect: index === q.ans
+  }));
+ 
+  options = shuffleArray(options);
+ 
+  options.forEach((opt, i) => {
+   const btn = document.createElement('button');
+   btn.className = 'opt-btn';
+ 
+   btn.innerHTML = `<span class="opt-label">${String.fromCharCode(65+i)}</span> ${opt.text}`;
+ 
+   btn.onclick = () => selectAnswer(opt.isCorrect, btn, q);
+ 
+   container.appendChild(btn);
   });
   document.getElementById('explanation-box').style.display = 'none';
   document.getElementById('next-btn').style.display = 'none';
@@ -708,42 +728,54 @@ function renderQuestion() {
   setTimeout(() => { card.style.transition = 'all 0.35s ease'; card.style.opacity = '1'; card.style.transform = 'scale(1)'; }, 50);
 }
 
-function selectAnswer(idx, clickedBtn) {
+function selectAnswer(isCorrect, clickedBtn, q) {
   if (answered) return;
   answered = true;
-  const q = highQuestions[currentQ];
+ 
   const allBtns = document.querySelectorAll('.opt-btn');
   allBtns.forEach(b => b.classList.add('disabled'));
-  const isCorrect = idx === q.ans;
-  userAnswers.push({ qIdx: currentQ, userAns: idx, correct: isCorrect });
-
+ 
+  userAnswers.push({
+    qIdx: currentQ,
+    correct: isCorrect
+  });
+ 
   if (isCorrect) {
     clickedBtn.classList.add('correct');
-    score += 5; correct++;
+    score += 5;
+    correct++;
+ 
     document.getElementById('hud-score').textContent = score;
     document.getElementById('hud-correct').textContent = correct;
-    // Attack enemy
+ 
     enemyHP = Math.max(0, enemyHP - enemyDamagePerCorrect);
     updateHealthBars();
+ 
     playerAttacking = true;
     enemyShaking = true;
-    setTimeout(() => { playerAttacking = false; enemyShaking = false; }, 600);
-    createParticleBurst(battleCanvas.width*0.78, battleCanvas.height*0.62, '#ff3c60');
-    showCombatText('⚔️ HIT! +5', '#00ff88');
-    flash('rgba(0,255,136,0.1)');
+ 
+    setTimeout(() => {
+      playerAttacking = false;
+      enemyShaking = false;
+    }, 600);
+ 
   } else {
     clickedBtn.classList.add('wrong');
-    allBtns[q.ans].classList.add('correct');
+ 
+    // highlight correct option
+    allBtns.forEach(b => {
+      if (b.innerText.includes(q.opts[q.ans])) {
+        b.classList.add('correct');
+      }
+    });
+ 
     playerHP = Math.max(0, playerHP - playerDamagePerWrong);
     updateHealthBars();
+ 
     playerDamage = true;
-    setTimeout(() => { playerDamage = false; }, 600);
-    createParticleBurst(battleCanvas.width*0.2, battleCanvas.height*0.62, '#ff3c60');
-    showCombatText('💥 BLOCKED!', '#ff3c60');
-    flash('rgba(255,60,96,0.1)');
-    document.getElementById('q-card').classList.add('shake');
-    setTimeout(() => document.getElementById('q-card').classList.remove('shake'), 400);
+    setTimeout(() => playerDamage = false, 600);
   }
+ 
   document.getElementById('explanation-text').textContent = q.exp;
   document.getElementById('explanation-box').style.display = 'block';
   document.getElementById('next-btn').style.display = 'block';
