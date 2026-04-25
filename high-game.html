@@ -399,17 +399,16 @@ const highQuestions = [
     topic: "INDEX + MATCH" 
   },
   { 
-{ 
-    q: "To find the LAST occurrence of 'Item A' in a column using XLOOKUP, which argument must be modified?", 
+    q: "How can you count items in Col A that are NOT present in Col B?", 
     opts: [
-      "Search Mode (set to -1)", 
-      "Match Mode (set to 2)", 
-      "If Not Found (set to 0)", 
-      "Search Mode (set to 1)"
+      "=SUMPRODUCT(--(ISNA(MATCH(A1:A10, B1:B10, 0))))", 
+      "=COUNTIF(A1:A10, \"<>\"&B1:B10)", 
+      "=FILTER(A1:A10, B1:B10=\"\")", 
+      "=SUMPRODUCT(A1:A10<>B1:B10)"
     ], 
     ans: 0, 
-    exp: "Search Mode 1 is first-to-last (default), while -1 is last-to-first.", 
-    topic: "XLOOKUP" 
+    exp: "MATCH returns #N/A for missing items; ISNA converts these to TRUE; -- converts TRUE to 1, and SUMPRODUCT sums them.", 
+    topic: "INDEX + MATCH" 
   },
   { 
     q: "How do you FILTER Table1 to show rows where the Name (Col A) contains the letter 'z' (case-insensitive)?", 
@@ -496,16 +495,16 @@ const highQuestions = [
     topic: "Error Handling" 
   },
   { 
-    q: "How can you count items in Col A that are NOT present in Col B?", 
+    q: "If A1 = 'Alpha,Beta,Gamma', what does =TEXTSPLIT(A1, , \",\") do?", 
     opts: [
-      "=SUMPRODUCT(--(ISNA(MATCH(A1:A10, B1:B10, 0))))", 
-      "=COUNTIF(A1:A10, \"<>\"&B1:B10)", 
-      "=FILTER(A1:A10, B1:B10=\"\")", 
-      "=SUMPRODUCT(A1:A10<>B1:B10)"
+      "Spills the names into 3 separate ROWS (vertical)", 
+      "Spills the names into 3 separate COLUMNS (horizontal)", 
+      "Errors out because the 2nd argument is empty", 
+      "Returns the string without commas in a single cell"
     ], 
     ans: 0, 
-    exp: "MATCH returns #N/A for missing items; ISNA converts these to TRUE; -- converts TRUE to 1, and SUMPRODUCT sums them.", 
-    topic: "INDEX + MATCH" 
+    exp: "In TEXTSPLIT, the 2nd argument is the column delimiter. Skipping it and using the 3rd argument (row_delimiter) forces a vertical spill.", 
+    topic: "TEXTSPLIT" 
   },
   { 
     q: "What is the result of =INDEX(A1:C10, 0, 2)?", 
